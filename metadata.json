@@ -1,0 +1,6 @@
+{
+  "name": "Sanskrit Word Morphing Engine",
+  "description": "A zero-border dial-based Sanskrit word morphing and linguistic exploration engine with live train-of-thought voice narrative.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
