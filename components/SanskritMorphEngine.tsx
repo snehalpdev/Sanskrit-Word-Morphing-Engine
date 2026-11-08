@@ -5,8 +5,8 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Volume2, VolumeX, Sparkles, RefreshCw, Bookmark, 
   Keyboard, Compass, Mic, Atom, BookOpen, Grid, Layers, ArrowRight, ArrowLeft,
-  Check, Copy, Trash2, X, ScrollText, Feather,
-  Workflow, Table, BookMarked, ShieldAlert, CheckCircle2, ChevronDown
+  Check, Copy, Trash2, X, ScrollText, Feather, Activity,
+  Workflow, Table, BookMarked, ShieldAlert, ChevronDown
 } from 'lucide-react';
 
 interface Upasarga {
@@ -26,6 +26,8 @@ interface Dhatu {
   canHavePrefix: boolean; // Pāṇini 1.4.59 "उपसर्गाः क्रियायोगे"
   baseVerb?: string;
   atmanepada?: boolean;
+  baseNoun?: string;
+  nounGender?: 'masc' | 'neut' | 'fem';
 }
 
 interface SuffixResult {
@@ -34,6 +36,7 @@ interface SuffixResult {
   meaning: string;
   context: string;
   category: 'tinanta' | 'krdanta' | 'subanta';
+  targetType: 'kriya' | 'nama';
 }
 
 interface DerivationStep {
@@ -74,138 +77,28 @@ interface SavedExpression {
 // The 22 Traditional Pāṇinian Upasargas (प्रादयः) + None option
 // -------------------------------------------------------------
 const STANDARD_22_UPASARGAS: Upasarga[] = [
-  { 
-    sanskrit: "प्र", 
-    iast: "pra", 
-    meaning: "Forward, forth, intensive, preeminent", 
-    nuance: "Denotes motion forward, excess (प्रकर्ष), manifestation or superior excellence in action." 
-  },
-  { 
-    sanskrit: "परा", 
-    iast: "parā", 
-    meaning: "Away, back, far away, gone, reversal", 
-    nuance: "Signifies reversal (पराभव), opposition, defeat, or departure away from origin." 
-  },
-  { 
-    sanskrit: "अप", 
-    iast: "apa", 
-    meaning: "Away, away from, off, negative, deviation", 
-    nuance: "Denotes taking away, deterioration, offense (अपकार), loss or negative deflection." 
-  },
-  { 
-    sanskrit: "सम्", 
-    iast: "sam", 
-    meaning: "Together, completely, full, perfected, harmony", 
-    nuance: "Signifies perfection, auspicious union (सम्यक्), comprehensive completeness or sacred refinement." 
-  },
-  { 
-    sanskrit: "अनु", 
-    iast: "anu", 
-    meaning: "After, along, following, in accordance with", 
-    nuance: "Denotes imitation, succession, subordination, or continuous harmonious accompaniment (अनुगमन)." 
-  },
-  { 
-    sanskrit: "अव", 
-    iast: "ava", 
-    meaning: "Down, downward, off, under, comprehension", 
-    nuance: "Indicates descent (अवतार), thorough comprehension (अवगम), or depreciation." 
-  },
-  { 
-    sanskrit: "निस्", 
-    iast: "nis", 
-    meaning: "Out, out of, away (becomes निर् nir / निश्)", 
-    nuance: "Represents motion outwards (निर्गमन), absence, certainty, or complete elimination." 
-  },
-  { 
-    sanskrit: "निर्", 
-    iast: "nir", 
-    meaning: "Out, away, without, completely, free from", 
-    nuance: "Signifies total extraction, being devoid of (निर्धन), definitive certainty, or liberation." 
-  },
-  { 
-    sanskrit: "दुस्", 
-    iast: "dus", 
-    meaning: "Bad, difficult, hard, wicked (becomes दुर्/दुश्)", 
-    nuance: "Denotes evil, hardship (दुष्कर), pain, moral difficulty, or reprobation." 
-  },
-  { 
-    sanskrit: "दुर्", 
-    iast: "dur", 
-    meaning: "Bad, hard, difficult, troublesome", 
-    nuance: "Indicates adversity (दुर्लभ), corruption, affliction, or strenuous obstacle." 
-  },
-  { 
-    sanskrit: "वि", 
-    iast: "vi", 
-    meaning: "Apart, separate, distinct, intensive, without", 
-    nuance: "Implies distribution, analytical distinction (विशेष), variance, or peaceful cessation." 
-  },
-  { 
-    sanskrit: "आ", 
-    iast: "ā (āṅ)", 
-    meaning: "Here, near, towards, up to, reversal, all around", 
-    nuance: "Indicates spatial reversal (आङ् मर्यादाभिविध्योः), inward arrival, or all-pervading scope." 
-  },
-  { 
-    sanskrit: "नि", 
-    iast: "ni", 
-    meaning: "In, into, down, inward, firmly settled", 
-    nuance: "Implies downward fixation (नितराम्), inward depth, residence (निवास), or quiet meditative composure." 
-  },
-  { 
-    sanskrit: "अधि", 
-    iast: "adhi", 
-    meaning: "Above, over, upon, superior, sovereign mastery", 
-    nuance: "Denotes sovereignty, presiding authority (आधिपत्य), scholarly attainment, or mastery." 
-  },
-  { 
-    sanskrit: "अपि", 
-    iast: "api", 
-    meaning: "Close to, proximate, also, over, covered", 
-    nuance: "Represents concealment (अपिधान), proximity, closure, or intimate attachment." 
-  },
-  { 
-    sanskrit: "अति", 
-    iast: "ati", 
-    meaning: "Beyond, over, excessive, very, surpassing", 
-    nuance: "Signifies transcending natural limits (अतिक्रमण), intensity, excess, or supreme degree." 
-  },
-  { 
-    sanskrit: "सु", 
-    iast: "su", 
-    meaning: "Good, well, easy, auspicious, pleasant", 
-    nuance: "Denotes auspiciousness (सुकृत), ease, sweetness, or moral excellence." 
-  },
-  { 
-    sanskrit: "उत्", 
-    iast: "ut (ud)", 
-    meaning: "Up, upwards, out, elevation, emergence", 
-    nuance: "Signifies upward elevation (उत्थान), sudden release of energy, or emergence of power." 
-  },
-  { 
-    sanskrit: "अभि", 
-    iast: "abhi", 
-    meaning: "Towards, to, into, facing, intensely confronting", 
-    nuance: "Indicates direct confrontation (आभिमुख्य), facing frontally (अभिमुख), or honoring." 
-  },
-  { 
-    sanskrit: "प्रति", 
-    iast: "prati", 
-    meaning: "Against, back, towards, in return, each", 
-    nuance: "Represents reflection, opposition, reciprocity (प्रतिदान), or rhythmic repetition." 
-  },
-  { 
-    sanskrit: "परि", 
-    iast: "pari", 
-    meaning: "Around, about, fully, completely, encircling", 
-    nuance: "Indicates comprehensive encirclement (समन्तात्), thorough inspection (परीक्षा), or total transformation." 
-  },
-  { 
-    sanskrit: "उप", 
-    iast: "upa", 
-    meaning: "Near, towards, by the side of, subordinate, assisting", 
-    nuance: "Denotes proximity (उपहार), discipleship (उपनिषद्), service, or gentle beginning." 
-  }
+  { sanskrit: "प्र", iast: "pra", meaning: "Forward, forth, intensive, preeminent", nuance: "Denotes motion forward, excess (प्रकर्ष), manifestation or superior excellence in action." },
+  { sanskrit: "परा", iast: "parā", meaning: "Away, back, far away, gone, reversal", nuance: "Signifies reversal (पराभव), opposition, defeat, or departure away from origin." },
+  { sanskrit: "अप", iast: "apa", meaning: "Away, away from, off, negative, deviation", nuance: "Denotes taking away, deterioration, offense (अपकार), loss or negative deflection." },
+  { sanskrit: "सम्", iast: "sam", meaning: "Together, completely, full, perfected, harmony", nuance: "Signifies perfection, auspicious union (सम्यक्), comprehensive completeness or sacred refinement." },
+  { sanskrit: "अनु", iast: "anu", meaning: "After, along, following, in accordance with", nuance: "Denotes imitation, succession, subordination, or continuous harmonious accompaniment (अनुगमन)." },
+  { sanskrit: "अव", iast: "ava", meaning: "Down, downward, off, under, comprehension", nuance: "Indicates descent (अवतार), thorough comprehension (अवगम), or depreciation." },
+  { sanskrit: "निस्", iast: "nis", meaning: "Out, out of, away (becomes निर् nir / निश्)", nuance: "Represents motion outwards (निर्गमन), absence, certainty, or complete elimination." },
+  { sanskrit: "निर्", iast: "nir", meaning: "Out, away, without, completely, free from", nuance: "Signifies total extraction, being devoid of (निर्धन), definitive certainty, or liberation." },
+  { sanskrit: "दुस्", iast: "dus", meaning: "Bad, difficult, hard, wicked (becomes दुर्/दुश्)", nuance: "Denotes evil, hardship (दुष्कर), pain, moral difficulty, or reprobation." },
+  { sanskrit: "दुर्", iast: "dur", meaning: "Bad, hard, difficult, troublesome", nuance: "Indicates adversity (दुर्लभ), corruption, affliction, or strenuous obstacle." },
+  { sanskrit: "वि", iast: "vi", meaning: "Apart, separate, distinct, intensive, without", nuance: "Implies distribution, analytical distinction (विशेष), variance, or peaceful cessation." },
+  { sanskrit: "आ", iast: "ā (āṅ)", meaning: "Here, near, towards, up to, reversal, all around", nuance: "Indicates spatial reversal (आङ् मर्यादाभिविध्योः), inward arrival, or all-pervading scope." },
+  { sanskrit: "नि", iast: "ni", meaning: "In, into, down, inward, firmly settled", nuance: "Implies downward fixation (नितराम्), inward depth, residence (निवास), or quiet meditative composure." },
+  { sanskrit: "अधि", iast: "adhi", meaning: "Above, over, upon, superior, sovereign mastery", nuance: "Denotes sovereignty, presiding authority (आधिपत्य), scholarly attainment, or mastery." },
+  { sanskrit: "अपि", iast: "api", meaning: "Close to, proximate, also, over, covered", nuance: "Represents concealment (अपिधान), proximity, closure, or intimate attachment." },
+  { sanskrit: "अति", iast: "ati", meaning: "Beyond, over, excessive, very, surpassing", nuance: "Signifies transcending natural limits (अतिक्रमण), intensity, excess, or supreme degree." },
+  { sanskrit: "सु", iast: "su", meaning: "Good, well, easy, auspicious, pleasant", nuance: "Denotes auspiciousness (सुकृत), ease, sweetness, or moral excellence." },
+  { sanskrit: "उत्", iast: "ut (ud)", meaning: "Up, upwards, out, elevation, emergence", nuance: "Signifies upward elevation (उत्थान), sudden release of energy, or emergence of power." },
+  { sanskrit: "अभि", iast: "abhi", meaning: "Towards, to, into, facing, intensely confronting", nuance: "Indicates direct confrontation (आभिमुख्य), facing frontally (अभिमुख), or honoring." },
+  { sanskrit: "प्रति", iast: "prati", meaning: "Against, back, towards, in return, each", nuance: "Represents reflection, opposition, reciprocity (प्रतिदान), or rhythmic repetition." },
+  { sanskrit: "परि", iast: "pari", meaning: "Around, about, fully, completely, encircling", nuance: "Indicates comprehensive encirclement (समन्तात्), thorough inspection (परीक्षा), or total transformation." },
+  { sanskrit: "उप", iast: "upa", meaning: "Near, towards, by the side of, subordinate, assisting", nuance: "Denotes proximity (उपहार), discipleship (उपनिषद्), service, or gentle beginning." }
 ];
 
 const NONE_UPASARGA: Upasarga = {
@@ -228,7 +121,9 @@ const DHATUS: Dhatu[] = [
     type: "kriya", 
     canHavePrefix: true, 
     baseVerb: "रमते", 
-    atmanepada: true 
+    atmanepada: true,
+    baseNoun: "रामः",
+    nounGender: "masc"
   },
   { 
     sanskrit: "पठ्", 
@@ -238,7 +133,9 @@ const DHATUS: Dhatu[] = [
     type: "kriya", 
     canHavePrefix: true, 
     baseVerb: "पठति", 
-    atmanepada: false 
+    atmanepada: false,
+    baseNoun: "पाठः",
+    nounGender: "masc"
   },
   { 
     sanskrit: "गम्", 
@@ -248,7 +145,9 @@ const DHATUS: Dhatu[] = [
     type: "kriya", 
     canHavePrefix: true, 
     baseVerb: "गच्छति", 
-    atmanepada: false 
+    atmanepada: false,
+    baseNoun: "गमनम्",
+    nounGender: "neut"
   },
   { 
     sanskrit: "लिख्", 
@@ -258,7 +157,9 @@ const DHATUS: Dhatu[] = [
     type: "kriya", 
     canHavePrefix: true, 
     baseVerb: "लिखति", 
-    atmanepada: false 
+    atmanepada: false,
+    baseNoun: "लेखः",
+    nounGender: "masc"
   },
   { 
     sanskrit: "दृश्", 
@@ -268,7 +169,9 @@ const DHATUS: Dhatu[] = [
     type: "kriya", 
     canHavePrefix: true, 
     baseVerb: "पश्यति", 
-    atmanepada: false 
+    atmanepada: false,
+    baseNoun: "दर्शनम्",
+    nounGender: "neut"
   },
   { 
     sanskrit: "कृ", 
@@ -278,7 +181,9 @@ const DHATUS: Dhatu[] = [
     type: "kriya", 
     canHavePrefix: true, 
     baseVerb: "करोति", 
-    atmanepada: false 
+    atmanepada: false,
+    baseNoun: "कार्यम्",
+    nounGender: "neut"
   },
   { 
     sanskrit: "भू", 
@@ -288,7 +193,9 @@ const DHATUS: Dhatu[] = [
     type: "kriya", 
     canHavePrefix: true, 
     baseVerb: "भवति", 
-    atmanepada: false 
+    atmanepada: false,
+    baseNoun: "भावः",
+    nounGender: "masc"
   },
   { 
     sanskrit: "स्था", 
@@ -298,7 +205,9 @@ const DHATUS: Dhatu[] = [
     type: "kriya", 
     canHavePrefix: true, 
     baseVerb: "तिष्ठति", 
-    atmanepada: false 
+    atmanepada: false,
+    baseNoun: "स्थानम्",
+    nounGender: "neut"
   },
   { 
     sanskrit: "दा", 
@@ -308,7 +217,9 @@ const DHATUS: Dhatu[] = [
     type: "kriya", 
     canHavePrefix: true, 
     baseVerb: "ददाति", 
-    atmanepada: false 
+    atmanepada: false,
+    baseNoun: "दानम्",
+    nounGender: "neut"
   },
   { 
     sanskrit: "ज्ञा", 
@@ -318,16 +229,20 @@ const DHATUS: Dhatu[] = [
     type: "kriya", 
     canHavePrefix: true, 
     baseVerb: "जानाति", 
-    atmanepada: false 
+    atmanepada: false,
+    baseNoun: "ज्ञानम्",
+    nounGender: "neut"
   },
-  // Nominal Noun Stems (Prātipadika) - CANNOT have Upasargas per Pāṇini 1.4.59
+  // Nominal Noun Stems (Prātipadika)
   { 
     sanskrit: "राम", 
     iast: "rāma", 
     meaning: "Noble person, charming one (Rama)", 
     gana: "Ajanta Puṃliṅga (Prātipadika)", 
     type: "nama", 
-    canHavePrefix: false 
+    canHavePrefix: false,
+    baseNoun: "रामः",
+    nounGender: "masc"
   },
   { 
     sanskrit: "देव", 
@@ -335,7 +250,9 @@ const DHATUS: Dhatu[] = [
     meaning: "Luminous being, celestial light, deity", 
     gana: "Ajanta Puṃliṅga (Prātipadika)", 
     type: "nama", 
-    canHavePrefix: false 
+    canHavePrefix: false,
+    baseNoun: "देवः",
+    nounGender: "masc"
   },
   { 
     sanskrit: "ज्ञान", 
@@ -343,214 +260,11 @@ const DHATUS: Dhatu[] = [
     meaning: "Direct gnosis, illumined insight", 
     gana: "Ajanta Napuṃsakaliṅga (Prātipadika)", 
     type: "nama", 
-    canHavePrefix: false 
+    canHavePrefix: false,
+    baseNoun: "ज्ञानम्",
+    nounGender: "neut"
   }
 ];
-
-// -------------------------------------------------------------
-// Curated Classical Morphological Derivations
-// -------------------------------------------------------------
-const MORPH_RULES: Record<string, SuffixResult[]> = {
-  // Pure un-prefixed verbs
-  "none-रम्": [
-    { sanskrit: "रमते", iast: "ramate", meaning: "he delights / takes pleasure", context: "Present Indicative (Laṭ, 3rd Person Singular Ātmanepada)", category: "tinanta" },
-    { sanskrit: "रमित्वा", iast: "ramitvā", meaning: "having delighted / rested", context: "Absolutive (Ktvā Pratyaya)", category: "krdanta" },
-    { sanskrit: "रमणम्", iast: "ramaṇam", meaning: "delight, sporting, pleasing", context: "Action Noun (Lyut)", category: "subanta" }
-  ],
-  "none-पठ्": [
-    { sanskrit: "पठति", iast: "paṭhati", meaning: "he reads / recites / studies", context: "Present Indicative (Laṭ, 3rd Person Singular)", category: "tinanta" },
-    { sanskrit: "पठित्वा", iast: "paṭhitvā", meaning: "having read / recited", context: "Absolutive (Ktvā)", category: "krdanta" },
-    { sanskrit: "पाठः", iast: "pāṭhaḥ", meaning: "lesson, reading, recital", context: "Action Noun (Ghañ)", category: "subanta" }
-  ],
-  "none-गम्": [
-    { sanskrit: "गच्छति", iast: "gacchati", meaning: "he goes / walks / reaches", context: "Present Indicative (Laṭ, 3rd Person Singular)", category: "tinanta" },
-    { sanskrit: "गत्वा", iast: "gatvā", meaning: "having gone", context: "Absolutive (Ktvā)", category: "krdanta" },
-    { sanskrit: "गमनम्", iast: "gamanam", meaning: "going, transit, departure", context: "Action Noun (Lyut)", category: "subanta" }
-  ],
-  "none-कृ": [
-    { sanskrit: "करोति", iast: "karoti", meaning: "he does / makes / acts", context: "Present Indicative (Laṭ)", category: "tinanta" },
-    { sanskrit: "कृत्वा", iast: "kṛtvā", meaning: "having done / performed", context: "Absolutive (Ktvā)", category: "krdanta" },
-    { sanskrit: "कार्यम्", iast: "kāryam", meaning: "duty, action to be done", context: "Gerundive (Ṇyat)", category: "subanta" }
-  ],
-  "none-भू": [
-    { sanskrit: "भवति", iast: "bhavati", meaning: "he is / becomes / happens", context: "Present Indicative (Laṭ)", category: "tinanta" },
-    { sanskrit: "भूत्वा", iast: "bhūtvā", meaning: "having become / existed", context: "Absolutive (Ktvā)", category: "krdanta" },
-    { sanskrit: "भावः", iast: "bhāvaḥ", meaning: "existence, state of being, emotion", context: "Action Noun (Ghañ)", category: "subanta" }
-  ],
-  "none-स्था": [
-    { sanskrit: "तिष्ठति", iast: "tiṣṭhati", meaning: "he stands / abides / remains", context: "Present Indicative (Laṭ)", category: "tinanta" },
-    { sanskrit: "स्थित्वा", iast: "sthitvā", meaning: "having stood / remained", context: "Absolutive (Ktvā)", category: "krdanta" },
-    { sanskrit: "स्थानम्", iast: "sthānam", meaning: "place, position, abode", context: "Action Noun (Lyut)", category: "subanta" }
-  ],
-  "none-राम": [
-    { sanskrit: "रामः", iast: "rāmaḥ", meaning: "Rama (Nominative Subject)", context: "Prathamā Ekavacana (Nominative Singular)", category: "subanta" },
-    { sanskrit: "रामम्", iast: "rāmam", meaning: "Rama (Accusative Object)", context: "Dvitīyā Ekavacana (Accusative Singular)", category: "subanta" },
-    { sanskrit: "रामेण", iast: "rāmeṇa", meaning: "By/With Rama (Instrumental Agent)", context: "Tṛtīyā Ekavacana (Instrumental Singular)", category: "subanta" }
-  ],
-  "none-देव": [
-    { sanskrit: "देवः", iast: "devaḥ", meaning: "The luminous deity (Subject)", context: "Prathamā Ekavacana", category: "subanta" },
-    { sanskrit: "देवम्", iast: "devam", meaning: "Unto the deity (Object)", context: "Dvitīyā Ekavacana", category: "subanta" }
-  ],
-  "none-ज्ञान": [
-    { sanskrit: "ज्ञानम्", iast: "jñānam", meaning: "Direct knowledge, gnosis", context: "Prathamā Ekavacana (Neuter)", category: "subanta" },
-    { sanskrit: "ज्ञानेन", iast: "jñānena", meaning: "Through illumination/knowledge", context: "Tṛtīyā Ekavacana", category: "subanta" }
-  ],
-
-  // Specific 22 Upasargas + Roots
-  "प्र-रम्": [
-    { sanskrit: "प्ररमते", iast: "praramate", meaning: "he delights greatly / rejoices", context: "Present Indicative (Laṭ, 3rd Person Singular)", category: "tinanta" },
-    { sanskrit: "प्ररम्य", iast: "praramya", meaning: "having rejoiced / exceedingly delightful", context: "Absolutive (Lyap Pratyaya)", category: "krdanta" },
-    { sanskrit: "प्ररामः", iast: "prarāmaḥ", meaning: "noble delight / ecstatic repose", context: "Primary Nominal Action Noun (Ghañ)", category: "subanta" }
-  ],
-  "वि-रम्": [
-    { sanskrit: "विरमति", iast: "viramati", meaning: "he desists / stops / pauses", context: "Present Indicative (Laṭ, Parasmaipada by व्याङ्परिभ्यो रमः)", category: "tinanta" },
-    { sanskrit: "विरामः", iast: "virāmaḥ", meaning: "cessation, pause, tranquil rest", context: "Nominal Derivative (Ghañ)", category: "subanta" },
-    { sanskrit: "विरम्य", iast: "viramya", meaning: "having paused / desisted from unrest", context: "Absolutive (Lyap)", category: "krdanta" }
-  ],
-  "आ-रम्": [
-    { sanskrit: "आरभते", iast: "ārabhate", meaning: "he undertakes / commences resolutely", context: "Present Indicative (Laṭ, 3rd Person Singular)", category: "tinanta" },
-    { sanskrit: "आरम्भः", iast: "ārambhaḥ", meaning: "commencement, inception, noble undertaking", context: "Primary Nominal Derivative (Ghañ)", category: "subanta" },
-    { sanskrit: "आरब्धवान्", iast: "ārabdhavān", meaning: "one who has commenced", context: "Past Active Participle (Ktavatu)", category: "krdanta" }
-  ],
-  "सम्-रम्": [
-    { sanskrit: "संरमते", iast: "saṃramate", meaning: "he becomes intensely excited / roused", context: "Present Indicative (Laṭ, 3rd Person Singular)", category: "tinanta" },
-    { sanskrit: "संरम्भः", iast: "saṃrambhaḥ", meaning: "vehemence, righteous fervor, enthusiasm", context: "Action Noun (Ghañ)", category: "subanta" }
-  ],
-  "परि-रम्": [
-    { sanskrit: "परिरमते", iast: "pariramate", meaning: "he embraces warmly / revels around", context: "Present Indicative (Laṭ, 3rd Person)", category: "tinanta" },
-    { sanskrit: "परिरम्भः", iast: "parirambhaḥ", meaning: "loving embrace, encirclement of joy", context: "Nominal Derivative (Ghañ)", category: "subanta" }
-  ],
-  "अनु-रम्": [
-    { sanskrit: "अनुरमते", iast: "anuramate", meaning: "he is devoted to / follows with delight", context: "Present Indicative (Laṭ, 3rd Person)", category: "tinanta" },
-    { sanskrit: "अनुरागः", iast: "anurāgaḥ", meaning: "deep affectionate attachment, love", context: "Nominal Derivative", category: "subanta" }
-  ],
-  "उप-रम्": [
-    { sanskrit: "उपरमति", iast: "uparamati", meaning: "he ceases from worldly desire / finds quiet", context: "Present Indicative (Laṭ)", category: "tinanta" },
-    { sanskrit: "उपरमः", iast: "uparamaḥ", meaning: "tranquil cessation, withdrawal of senses", context: "Vedantic Virtue", category: "subanta" }
-  ],
-  "अभि-रम्": [
-    { sanskrit: "अभिरमते", iast: "abhiramate", meaning: "he revels contentedly / finds inward peace", context: "Present Indicative (Laṭ)", category: "tinanta" },
-    { sanskrit: "अभिरामः", iast: "abhirāmaḥ", meaning: "exquisitely charming, delightfully serene", context: "Classical Epithet", category: "subanta" }
-  ],
-
-  // गम् combinations
-  "आ-गम्": [
-    { sanskrit: "आगच्छति", iast: "āgacchati", meaning: "he comes / arrives", context: "Present Indicative (Laṭ, 3rd Person Singular)", category: "tinanta" },
-    { sanskrit: "आगमनम्", iast: "āgamanam", meaning: "arrival, incoming presence", context: "Action Noun (Lyut)", category: "subanta" },
-    { sanskrit: "आगत्य", iast: "āgatya", meaning: "having arrived / having approached", context: "Absolutive (Lyap)", category: "krdanta" }
-  ],
-  "अनु-गम्": [
-    { sanskrit: "अनुगच्छति", iast: "anugacchati", meaning: "he follows / accompanies discipleship", context: "Present Indicative (Laṭ)", category: "tinanta" },
-    { sanskrit: "अनुगमनम्", iast: "anugamanam", meaning: "following, walking in footsteps", context: "Action Noun (Lyut)", category: "subanta" }
-  ],
-  "सम्-गम्": [
-    { sanskrit: "सङ्गच्छते", iast: "saṅgacchate", meaning: "they unite / converge in harmony", context: "Present Indicative (Laṭ, Ātmanepada by समो गम्यृच्छिभ्याम्)", category: "tinanta" },
-    { sanskrit: "सङ्गमः", iast: "saṅgamaḥ", meaning: "sacred confluence, meeting of rivers/souls", context: "Nominal Derivative (Ghañ)", category: "subanta" }
-  ],
-  "उत्-गम्": [
-    { sanskrit: "उद्गच्छति", iast: "udgacchati", meaning: "he rises upward / emerges / ascends", context: "Present Indicative (Laṭ)", category: "tinanta" },
-    { sanskrit: "उद्गमः", iast: "udgamaḥ", meaning: "emergence, origin, dawn", context: "Nominal Derivative (Ghañ)", category: "subanta" }
-  ],
-  "प्रति-गम्": [
-    { sanskrit: "प्रतिगच्छति", iast: "pratigacchati", meaning: "he returns / goes back", context: "Present Indicative (Laṭ)", category: "tinanta" },
-    { sanskrit: "प्रतिगमनम्", iast: "pratigamanam", meaning: "return, coming back", context: "Action Noun (Lyut)", category: "subanta" }
-  ],
-  "अव-गम्": [
-    { sanskrit: "अवगच्छति", iast: "avagacchati", meaning: "he understands / grasps / perceives", context: "Present Indicative (Laṭ)", category: "tinanta" },
-    { sanskrit: "अवगतिः", iast: "avagatiḥ", meaning: "comprehension, realization", context: "Action Noun (Ktin)", category: "subanta" }
-  ],
-  "अधि-गम्": [
-    { sanskrit: "अधिगच्छति", iast: "adhigacchati", meaning: "he masters / acquires / attains wisdom", context: "Present Indicative (Laṭ)", category: "tinanta" },
-    { sanskrit: "अधिगमः", iast: "adhigamaḥ", meaning: "attainment, intellectual acquisition", context: "Nominal Derivative", category: "subanta" }
-  ],
-  "उप-गम्": [
-    { sanskrit: "उपगच्छति", iast: "upagacchati", meaning: "he approaches respectfully / draws near", context: "Present Indicative (Laṭ)", category: "tinanta" },
-    { sanskrit: "उपगमः", iast: "upagamaḥ", meaning: "approach, arrival, agreement", context: "Nominal Derivative", category: "subanta" }
-  ],
-  "निर्-गम्": [
-    { sanskrit: "निर्गच्छति", iast: "nirgacchati", meaning: "he exits / departs / goes forth", context: "Present Indicative (Laṭ)", category: "tinanta" },
-    { sanskrit: "निर्गमः", iast: "nirgamaḥ", meaning: "exit, departure, outflow", context: "Nominal Derivative", category: "subanta" }
-  ],
-
-  // कृ combinations
-  "सम्-कृ": [
-    { sanskrit: "संस्कुरुते", iast: "saṃskurute", meaning: "he refines / sanctifies / purifies", context: "Present Indicative (Laṭ, Suṭ-āgama by सम्परिभ्यां करोतौ भूषणे)", category: "tinanta" },
-    { sanskrit: "संस्कृतम्", iast: "saṃskṛtam", meaning: "refined, perfected, sacred Sanskrit", context: "Past Passive Participle (Kta)", category: "krdanta" },
-    { sanskrit: "संस्कारः", iast: "saṃskāraḥ", meaning: "sacrament, subtle mental impression, refinement", context: "Action Noun (Ghañ)", category: "subanta" }
-  ],
-  "प्र-कृ": [
-    { sanskrit: "प्रकरोति", iast: "prakaroti", meaning: "he brings forth / manifests / executes", context: "Present Indicative (Laṭ)", category: "tinanta" },
-    { sanskrit: "प्रकृतिः", iast: "prakṛtiḥ", meaning: "primal creative matrix, pristine nature", context: "Feminine Action Noun (Ktin)", category: "subanta" }
-  ],
-  "वि-कृ": [
-    { sanskrit: "विकरोति", iast: "vikaroti", meaning: "he alters / transforms / deforms", context: "Present Indicative (Laṭ)", category: "tinanta" },
-    { sanskrit: "विकारः", iast: "vikāraḥ", meaning: "transformation, emotive variation, alteration", context: "Nominal Derivative (Ghañ)", category: "subanta" }
-  ],
-  "उप-कृ": [
-    { sanskrit: "उपकरोति", iast: "upakaroti", meaning: "he helps / confers benefit / assists", context: "Present Indicative (Laṭ)", category: "tinanta" },
-    { sanskrit: "उपकारः", iast: "upakāraḥ", meaning: "benevolence, assistance, kindness", context: "Nominal Derivative", category: "subanta" }
-  ],
-  "अप-कृ": [
-    { sanskrit: "अपकरोति", iast: "apakaroti", meaning: "he injures / offends / acts wrongfully", context: "Present Indicative (Laṭ)", category: "tinanta" },
-    { sanskrit: "अपकारः", iast: "apakāraḥ", meaning: "harm, offense, malice", context: "Nominal Derivative", category: "subanta" }
-  ],
-  "अनु-कृ": [
-    { sanskrit: "अनुकरोति", iast: "anukaroti", meaning: "he imitates / mimics / follows in act", context: "Present Indicative (Laṭ)", category: "tinanta" },
-    { sanskrit: "अनुकरणम्", iast: "anukaraṇam", meaning: "imitation, simulation", context: "Action Noun (Lyut)", category: "subanta" }
-  ],
-  "अधि-कृ": [
-    { sanskrit: "अधिकारोति", iast: "adhikaroti", meaning: "he presides over / authorizes / appoints", context: "Present Indicative (Laṭ)", category: "tinanta" },
-    { sanskrit: "अधिकारः", iast: "adhikāraḥ", meaning: "sovereign right, jurisdiction, authority", context: "Nominal Derivative", category: "subanta" }
-  ],
-
-  // भू combinations
-  "प्र-भू": [
-    { sanskrit: "प्रभवति", iast: "prabhavati", meaning: "he originates / holds sovereign mastery", context: "Present Indicative (Laṭ)", category: "tinanta" },
-    { sanskrit: "प्रभावः", iast: "prabhāvaḥ", meaning: "spiritual majesty, sovereign potency", context: "Nominal Derivative (Ghañ)", category: "subanta" }
-  ],
-  "अनु-भू": [
-    { sanskrit: "अनुभवति", iast: "anubhavati", meaning: "he experiences / perceives within consciousness", context: "Present Indicative (Laṭ)", category: "tinanta" },
-    { sanskrit: "अनुभवः", iast: "anubhavaḥ", meaning: "direct experience, spiritual realization", context: "Nominal Derivative (Ghañ)", category: "subanta" }
-  ],
-  "सम्-भू": [
-    { sanskrit: "सम्भवति", iast: "sambhavati", meaning: "it happens / becomes possible / coalesces", context: "Present Indicative (Laṭ)", category: "tinanta" },
-    { sanskrit: "सम्भवः", iast: "sambhavaḥ", meaning: "birth, manifestation, possibility", context: "Nominal Derivative", category: "subanta" }
-  ],
-  "परा-भू": [
-    { sanskrit: "पराभवति", iast: "parābhavati", meaning: "he is defeated / undergoes eclipse", context: "Present Indicative (Laṭ)", category: "tinanta" },
-    { sanskrit: "पराभवः", iast: "parābhavaḥ", meaning: "defeat, humiliation, downfall", context: "Nominal Derivative", category: "subanta" }
-  ],
-  "परि-भू": [
-    { sanskrit: "परिभवति", iast: "paribhavati", meaning: "he overlooks / despises / insults", context: "Present Indicative (Laṭ)", category: "tinanta" },
-    { sanskrit: "परिभवः", iast: "paribhavaḥ", meaning: "disregard, contempt, humiliation", context: "Nominal Derivative", category: "subanta" }
-  ],
-  "अभि-भू": [
-    { sanskrit: "अभिभवति", iast: "abhibhavati", meaning: "he overpowers / dominates / overwhelms", context: "Present Indicative (Laṭ)", category: "tinanta" },
-    { sanskrit: "अभिभावकः", iast: "abhibhāvakaḥ", meaning: "guardian, overseer, protector", context: "Agent Noun", category: "subanta" }
-  ],
-  "उत्-भू": [
-    { sanskrit: "उद्भवति", iast: "udbhavati", meaning: "he arises / originates / springs forth", context: "Present Indicative (Laṭ)", category: "tinanta" },
-    { sanskrit: "उद्भवः", iast: "udbhavaḥ", meaning: "generation, birth, origin", context: "Nominal Derivative", category: "subanta" }
-  ],
-
-  // स्था combinations
-  "प्र-स्था": [
-    { sanskrit: "प्रतिष्ठते", iast: "pratiṣṭhate", meaning: "he departs / sets forth / is established", context: "Present Indicative (Laṭ)", category: "tinanta" },
-    { sanskrit: "प्रस्थानम्", iast: "prasthānam", meaning: "departure, sacred journey, foundation", context: "Action Noun (Lyut)", category: "subanta" }
-  ],
-  "अनु-स्था": [
-    { sanskrit: "अनुतिष्ठति", iast: "anutiṣṭhati", meaning: "he practices / performs sacred rite", context: "Present Indicative (Laṭ)", category: "tinanta" },
-    { sanskrit: "अनुष्ठानम्", iast: "anuṣṭhānam", meaning: "religious observance, rigorous performance", context: "Action Noun", category: "subanta" }
-  ],
-  "उत्-स्था": [
-    { sanskrit: "उत्तिष्ठति", iast: "uttiṣṭhati", meaning: "he stands up / rises / awakens", context: "Present Indicative (Laṭ by उदः स्थास्तम्भोः पूर्वस्य)", category: "tinanta" },
-    { sanskrit: "उत्थानम्", iast: "utthānam", meaning: "uprising, rising, enterprise", context: "Action Noun", category: "subanta" }
-  ],
-  "अधि-स्था": [
-    { sanskrit: "अधितिष्ठति", iast: "adhitiṣṭhati", meaning: "he presides over / occupies / dwells within", context: "Present Indicative (Laṭ)", category: "tinanta" },
-    { sanskrit: "अधिष्ठानम्", iast: "adhiṣṭhānam", meaning: "substratum, seat, presiding base", context: "Action Noun", category: "subanta" }
-  ]
-};
 
 const VACANA_HEADERS = [
   { sanskrit: "एकवचनम्", english: "Singular" },
@@ -558,104 +272,172 @@ const VACANA_HEADERS = [
   { sanskrit: "बहुवचनम्", english: "Plural" }
 ];
 
-// Helper to compute morphophonemics for any of the 22 Upasargas + Dhatu
-function synthesizeMorphology(upasarga: Upasarga, dhatu: Dhatu): SuffixResult[] {
+// -------------------------------------------------------------------
+// Synthesizes Action Word (Tiṅanta) and Name Word (Subanta) Derivatives
+// -------------------------------------------------------------------
+function getDerivedPair(upasarga: Upasarga, dhatu: Dhatu): { actionWord: SuffixResult; nameWord: SuffixResult } {
   const isNone = upasarga.isNone || !dhatu.canHavePrefix;
-  const key = `${isNone ? 'none' : upasarga.sanskrit}-${dhatu.sanskrit}`;
+  const pDev = isNone ? '' : upasarga.sanskrit;
+  const pIast = isNone ? '' : upasarga.iast.replace(/ \(.*\)/, '');
+  const dDev = dhatu.sanskrit;
 
-  if (MORPH_RULES[key]) {
-    return MORPH_RULES[key];
-  }
-
-  // If nominal root (Prātipadika) -> No Upasarga
-  if (!dhatu.canHavePrefix || dhatu.type === 'nama') {
-    const isNeuter = dhatu.sanskrit === 'ज्ञान';
-    const nomSing = isNeuter ? `${dhatu.sanskrit}म्` : `${dhatu.sanskrit}ः`;
-    const accSing = `${dhatu.sanskrit}म्`;
-    return [
-      {
-        sanskrit: nomSing,
+  // Inherent nominal stem
+  if (dhatu.type === 'nama' || !dhatu.canHavePrefix) {
+    const isNeuter = dDev === 'ज्ञान';
+    const nomNoun = isNeuter ? `${dDev}म्` : `${dDev}ः`;
+    return {
+      actionWord: {
+        sanskrit: `${dDev}ायते`,
+        iast: `${dhatu.iast}āyate`,
+        meaning: `acts like ${dhatu.meaning.toLowerCase()} (Denominative verb / नामधातु)`,
+        context: "Nāmadhātu Present Indicative (क्योङ् प्रत्ययः ३.१.११)",
+        category: "tinanta",
+        targetType: "kriya"
+      },
+      nameWord: {
+        sanskrit: nomNoun,
         iast: isNeuter ? `${dhatu.iast}m` : `${dhatu.iast}ḥ`,
-        meaning: `${dhatu.meaning} (Nominative / प्रथमा)`,
-        context: "Subanta Pada (प्रातिपदिकार्थलिङ्गपरिमाणवचनमात्रे प्रथमा २.३.४६)",
-        category: "subanta"
-      },
-      {
-        sanskrit: accSing,
-        iast: `${dhatu.iast}m`,
-        meaning: `${dhatu.meaning} (Accusative / द्वितीया)`,
-        context: "Subanta Pada (कर्मणि द्वितीया २.३.२)",
-        category: "subanta"
+        meaning: `${dhatu.meaning} (Subanta Noun)`,
+        context: "Nominal Prātipadika (प्रातिपदिकार्थलिङ्गपरिमाणवचनमात्रे प्रथमा २.३.४६)",
+        category: "subanta",
+        targetType: "nama"
       }
-    ];
+    };
   }
 
-  // If bare verbal root without Upasarga
-  if (isNone) {
-    const verb = dhatu.baseVerb || `${dhatu.sanskrit}ति`;
-    return [
-      {
-        sanskrit: verb,
-        iast: `${dhatu.iast}ti`,
-        meaning: `he ${dhatu.meaning.toLowerCase()} (unprefixed base action)`,
-        context: "Present Indicative (Laṭ Lakāra, कर्तरी शप्)",
-        category: "tinanta"
-      },
-      {
-        sanskrit: `${dhatu.sanskrit}नम्`,
-        iast: `${dhatu.iast}nam`,
-        meaning: `the process / act of ${dhatu.meaning.toLowerCase()}`,
-        context: "Action Noun (Lyut Pratyaya)",
-        category: "subanta"
-      }
-    ];
-  }
+  // Pre-mapped combinations for authentic classical forms
+  const comboKey = `${pDev || 'none'}-${dDev}`;
 
-  // If prefixed verbal root: compute regular Sandhi and morphology
-  let prefixDev = upasarga.sanskrit;
-  let prefixIast = upasarga.iast.replace(/ \(.*\)/, '');
-  const rootVerb = dhatu.baseVerb || `${dhatu.sanskrit}ति`;
-
-  // Sandhi heuristics
-  let combinedSanskrit = `${prefixDev}${rootVerb}`;
-  let combinedIast = `${prefixIast}${dhatu.iast}ti`;
-
-  if (prefixDev === 'सम्') {
-    combinedSanskrit = `सं${rootVerb}`;
-    combinedIast = `saṃ${dhatu.iast}ti`;
-  } else if (prefixDev === 'उत्') {
-    if (['ग', 'भ', 'द'].some(c => rootVerb.startsWith(c))) {
-      combinedSanskrit = `उद्${rootVerb}`;
-      combinedIast = `ud${dhatu.iast}ti`;
-    } else if (rootVerb.startsWith('ल')) {
-      combinedSanskrit = `उल्${rootVerb}`;
-    }
-  } else if (prefixDev === 'निस्') {
-    if (['ग', 'भ', 'द'].some(c => rootVerb.startsWith(c))) {
-      combinedSanskrit = `निर्${rootVerb}`;
-    }
-  } else if (prefixDev === 'दुस्') {
-    if (['ग', 'भ', 'द'].some(c => rootVerb.startsWith(c))) {
-      combinedSanskrit = `दुर्${rootVerb}`;
-    }
-  }
-
-  return [
-    {
-      sanskrit: combinedSanskrit,
-      iast: combinedIast,
-      meaning: `${upasarga.meaning.split(',')[0].toLowerCase()} ${dhatu.meaning.toLowerCase()}`,
-      context: `Prefix '${upasarga.sanskrit}' (${upasarga.iast}) + Root '${dhatu.sanskrit}'`,
-      category: "tinanta"
+  const SPECIAL_MAP: Record<string, { actionWord: SuffixResult; nameWord: SuffixResult }> = {
+    "प्र-रम्": {
+      actionWord: { sanskrit: "प्ररमते", iast: "praramate", meaning: "he rejoices exceedingly", context: "Present Indicative (Laṭ, 3rd Person Singular Ātmanepada)", category: "tinanta", targetType: "kriya" },
+      nameWord: { sanskrit: "प्ररामः", iast: "prarāmaḥ", meaning: "transcendent joy, ecstatic delight", context: "Primary Nominal Action Noun (Ghañ Pratyaya)", category: "subanta", targetType: "nama" }
     },
-    {
-      sanskrit: `${prefixDev}${dhatu.sanskrit}नम्`,
-      iast: `${prefixIast}${dhatu.iast}nam`,
-      meaning: `the act of ${upasarga.meaning.split(',')[0].toLowerCase()} ${dhatu.meaning.toLowerCase()}`,
-      context: "Derivative Action Noun",
-      category: "subanta"
+    "वि-रम्": {
+      actionWord: { sanskrit: "विरमति", iast: "viramati", meaning: "he desists, pauses, stops", context: "Present Indicative (Laṭ, Parasmaipada by व्याङ्परिभ्यो रमः)", category: "tinanta", targetType: "kriya" },
+      nameWord: { sanskrit: "विरामः", iast: "virāmaḥ", meaning: "cessation, pause, tranquil rest", context: "Nominal Action Noun (Ghañ)", category: "subanta", targetType: "nama" }
+    },
+    "आ-रम्": {
+      actionWord: { sanskrit: "आरभते", iast: "ārabhate", meaning: "he commences resolutely", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
+      nameWord: { sanskrit: "आरम्भः", iast: "ārambhaḥ", meaning: "commencement, inception, enterprise", context: "Primary Nominal Derivative (Ghañ)", category: "subanta", targetType: "nama" }
+    },
+    "सम्-रम्": {
+      actionWord: { sanskrit: "संरमते", iast: "saṃramate", meaning: "he becomes intensely excited", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
+      nameWord: { sanskrit: "संरम्भः", iast: "saṃrambhaḥ", meaning: "impetuosity, righteous fervor", context: "Nominal Derivative (Ghañ)", category: "subanta", targetType: "nama" }
+    },
+    "आ-गम्": {
+      actionWord: { sanskrit: "आगच्छति", iast: "āgacchati", meaning: "he arrives, comes", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
+      nameWord: { sanskrit: "आगमनम्", iast: "āgamanam", meaning: "arrival, advent", context: "Action Noun (Lyut Pratyaya)", category: "subanta", targetType: "nama" }
+    },
+    "अनु-गम्": {
+      actionWord: { sanskrit: "अनुगच्छति", iast: "anugacchati", meaning: "he follows, accompanies", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
+      nameWord: { sanskrit: "अनुगमनम्", iast: "anugamanam", meaning: "following, discipleship", context: "Action Noun (Lyut)", category: "subanta", targetType: "nama" }
+    },
+    "सम्-गम्": {
+      actionWord: { sanskrit: "सङ्गच्छते", iast: "saṅgacchate", meaning: "they unite, converge in harmony", context: "Present Indicative (Laṭ, Ātmanepada)", category: "tinanta", targetType: "kriya" },
+      nameWord: { sanskrit: "सङ्गमः", iast: "saṅgamaḥ", meaning: "sacred confluence, meeting of souls", context: "Nominal Action Noun (Ghañ)", category: "subanta", targetType: "nama" }
+    },
+    "उत्-गम्": {
+      actionWord: { sanskrit: "उद्गच्छति", iast: "udgacchati", meaning: "he ascends, rises upward", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
+      nameWord: { sanskrit: "उद्गमः", iast: "udgamaḥ", meaning: "emergence, origin, spring", context: "Nominal Derivative (Ghañ)", category: "subanta", targetType: "nama" }
+    },
+    "सम्-कृ": {
+      actionWord: { sanskrit: "संस्कुरुते", iast: "saṃskurute", meaning: "he refines, purifies, sanctifies", context: "Present Indicative (Laṭ, Suṭ-āgama)", category: "tinanta", targetType: "kriya" },
+      nameWord: { sanskrit: "संस्कारः", iast: "saṃskāraḥ", meaning: "sacrament, spiritual impression, culture", context: "Action Noun (Ghañ)", category: "subanta", targetType: "nama" }
+    },
+    "प्र-कृ": {
+      actionWord: { sanskrit: "प्रकरोति", iast: "prakaroti", meaning: "he executes, brings forth", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
+      nameWord: { sanskrit: "प्रकृतिः", iast: "prakṛtiḥ", meaning: "primal creative nature, matrix", context: "Feminine Action Noun (Ktin)", category: "subanta", targetType: "nama" }
+    },
+    "उप-कृ": {
+      actionWord: { sanskrit: "उपकरोति", iast: "upakaroti", meaning: "he benefits, aids, assists", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
+      nameWord: { sanskrit: "उपकारः", iast: "upakāraḥ", meaning: "benevolence, assistance, kindness", context: "Nominal Derivative (Ghañ)", category: "subanta", targetType: "nama" }
+    },
+    "प्र-भू": {
+      actionWord: { sanskrit: "प्रभवति", iast: "prabhavati", meaning: "he originates, commands authority", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
+      nameWord: { sanskrit: "प्रभावः", iast: "prabhāvaḥ", meaning: "transcendent power, majesty, aura", context: "Nominal Derivative (Ghañ)", category: "subanta", targetType: "nama" }
+    },
+    "अनु-भू": {
+      actionWord: { sanskrit: "अनुभवति", iast: "anubhavati", meaning: "he experiences, perceives directly", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
+      nameWord: { sanskrit: "अनुभवः", iast: "anubhavaḥ", meaning: "direct experience, spiritual realization", context: "Nominal Derivative (Ghañ)", category: "subanta", targetType: "nama" }
+    },
+    "सम्-भू": {
+      actionWord: { sanskrit: "सम्भवति", iast: "sambhavati", meaning: "it becomes possible, coalesces", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
+      nameWord: { sanskrit: "सम्भवः", iast: "sambhavaḥ", meaning: "birth, manifestation, possibility", context: "Nominal Derivative (Ghañ)", category: "subanta", targetType: "nama" }
+    },
+    "प्र-स्था": {
+      actionWord: { sanskrit: "प्रतिष्ठते", iast: "pratiṣṭhate", meaning: "he departs, sets forth, abides", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
+      nameWord: { sanskrit: "प्रस्थानम्", iast: "prasthānam", meaning: "departure, sacred treatise, journey", context: "Action Noun (Lyut)", category: "subanta", targetType: "nama" }
+    },
+    "उत्-स्था": {
+      actionWord: { sanskrit: "उत्तिष्ठति", iast: "uttiṣṭhati", meaning: "he stands up, awakens, rises", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
+      nameWord: { sanskrit: "उत्थानम्", iast: "utthānam", meaning: "elevation, rising, spiritual awakening", context: "Action Noun (Lyut)", category: "subanta", targetType: "nama" }
+    },
+    "none-रम्": {
+      actionWord: { sanskrit: "रमते", iast: "ramate", meaning: "he delights, rejoices", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
+      nameWord: { sanskrit: "रामः", iast: "rāmaḥ", meaning: "delightful, noble person", context: "Action Noun / Epithet (Ghañ)", category: "subanta", targetType: "nama" }
+    },
+    "none-गम्": {
+      actionWord: { sanskrit: "गच्छति", iast: "gacchati", meaning: "he goes, moves", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
+      nameWord: { sanskrit: "गमनम्", iast: "gamanam", meaning: "going, transit", context: "Action Noun (Lyut)", category: "subanta", targetType: "nama" }
+    },
+    "none-कृ": {
+      actionWord: { sanskrit: "करोति", iast: "karoti", meaning: "he does, acts", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
+      nameWord: { sanskrit: "कार्यम्", iast: "kāryam", meaning: "duty, undertaking", context: "Gerundive Action Noun (Ṇyat)", category: "subanta", targetType: "nama" }
+    },
+    "none-भू": {
+      actionWord: { sanskrit: "भवति", iast: "bhavati", meaning: "he is, becomes", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
+      nameWord: { sanskrit: "भावः", iast: "bhāvaḥ", meaning: "state of being, emotion", context: "Action Noun (Ghañ)", category: "subanta", targetType: "nama" }
+    },
+    "none-स्था": {
+      actionWord: { sanskrit: "तिष्ठति", iast: "tiṣṭhati", meaning: "he stands, remains", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
+      nameWord: { sanskrit: "स्थानम्", iast: "sthānam", meaning: "abode, place, state", context: "Action Noun (Lyut)", category: "subanta", targetType: "nama" }
+    },
+    "none-पठ्": {
+      actionWord: { sanskrit: "पठति", iast: "paṭhati", meaning: "he reads, studies", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
+      nameWord: { sanskrit: "पाठः", iast: "pāṭhaḥ", meaning: "lesson, reading", context: "Action Noun (Ghañ)", category: "subanta", targetType: "nama" }
     }
-  ];
+  };
+
+  if (SPECIAL_MAP[comboKey]) {
+    return SPECIAL_MAP[comboKey];
+  }
+
+  // Fallback programmatic generation
+  let verb = dhatu.baseVerb || `${dDev}ति`;
+  let noun = dhatu.baseNoun || `${dDev}नम्`;
+
+  if (pDev) {
+    if (pDev === 'सम्') {
+      verb = `सं${verb}`;
+      noun = `सं${noun}`;
+    } else if (pDev === 'उत्') {
+      verb = `उद्${verb}`;
+      noun = `उद्${noun}`;
+    } else {
+      verb = `${pDev}${verb}`;
+      noun = `${pDev}${noun}`;
+    }
+  }
+
+  return {
+    actionWord: {
+      sanskrit: verb,
+      iast: `${pIast}${dhatu.iast}ti`,
+      meaning: `he performs action of ${dhatu.meaning.toLowerCase()}`,
+      context: "Present Indicative (Laṭ Lakāra)",
+      category: "tinanta",
+      targetType: "kriya"
+    },
+    nameWord: {
+      sanskrit: noun,
+      iast: `${pIast}${dhatu.iast}am`,
+      meaning: `the act / entity of ${dhatu.meaning.toLowerCase()}`,
+      context: "Derived Nominal Stem (Subanta Pada)",
+      category: "subanta",
+      targetType: "nama"
+    }
+  };
 }
 
 export default function SanskritMorphEngine() {
@@ -674,8 +456,8 @@ export default function SanskritMorphEngine() {
   const [savedUpasargaIndex, setSavedUpasargaIndex] = useState<number>(0);
   const [isPrefixQuickSelectOpen, setIsPrefixQuickSelectOpen] = useState<boolean>(false);
 
-  // Selected Suffix result index
-  const [suffixIndex, setSuffixIndex] = useState<number>(0);
+  // HIGH-LEVEL TOGGLE IN SUFFIX DIAL: 'kriya' (Action Word) vs 'nama' (Name Word)
+  const [suffixTargetType, setSuffixTargetType] = useState<'kriya' | 'nama'>('kriya');
 
   // Matrix cell selection
   const [selectedRowIndex, setSelectedRowIndex] = useState<number>(0);
@@ -705,11 +487,13 @@ export default function SanskritMorphEngine() {
       gana: customIsNominal ? "Custom Nominal (प्रातिपदिक)" : "Custom Root (धातु)", 
       type: customIsNominal ? 'nama' : 'kriya',
       canHavePrefix: !customIsNominal,
-      baseVerb: `${customDhatuSanskrit.trim()}ति`
+      baseVerb: `${customDhatuSanskrit.trim()}ति`,
+      baseNoun: `${customDhatuSanskrit.trim()}ः`,
+      nounGender: "masc"
     };
   }, [dhatuMode, dhatuIndex, customDhatuSanskrit, customDhatuIast, customDhatuMeaning, customIsNominal]);
 
-  // DYNAMIC DETERMINATION: If the selected root CANNOT have a prefix, prefix dial is dynamically set to NONE_UPASARGA
+  // Dynamic Kriyāyoga Check: If root cannot have prefix, set prefix to None
   const currentUpasarga: Upasarga = useMemo(() => {
     if (!currentDhatu.canHavePrefix) {
       return NONE_UPASARGA;
@@ -717,208 +501,182 @@ export default function SanskritMorphEngine() {
     return STANDARD_22_UPASARGAS[savedUpasargaIndex % STANDARD_22_UPASARGAS.length];
   }, [currentDhatu.canHavePrefix, savedUpasargaIndex]);
 
-  // Morphological derivation results
-  const availableSuffixes = useMemo(() => {
-    return synthesizeMorphology(currentUpasarga, currentDhatu);
+  // Suffix Derivation based on the High-Level Toggle (Action Word vs Name Word)
+  const derivedPair = useMemo(() => {
+    return getDerivedPair(currentUpasarga, currentDhatu);
   }, [currentUpasarga, currentDhatu]);
 
-  const currentResult = availableSuffixes[suffixIndex % availableSuffixes.length];
+  const currentResult: SuffixResult = useMemo(() => {
+    return suffixTargetType === 'kriya' ? derivedPair.actionWord : derivedPair.nameWord;
+  }, [suffixTargetType, derivedPair]);
 
-  // Dynamic Paradigm Matrix: 7x3 for Nominal, 3x3 for Verbal
+  // DYNAMIC PARADIGM MATRIX COMPUTATION:
+  // Directly computed and displayed based on whether suffixTargetType is 'nama' (7x3 grid) or 'kriya' (3x3 grid)!
   const dynamicMatrixData = useMemo(() => {
-    const isNama = currentDhatu.type === 'nama' || !currentDhatu.canHavePrefix;
-    const base = currentDhatu.sanskrit;
-    const hasPrefix = !currentUpasarga.isNone && currentDhatu.canHavePrefix;
-    const prefix = hasPrefix ? currentUpasarga.sanskrit : '';
+    if (suffixTargetType === 'nama') {
+      // 7 CASES × 3 NUMBERS (7 × 3 Nominal Grid)
+      const nominalWord = derivedPair.nameWord.sanskrit;
+      // Extract base without visarga or anusvara for inflections
+      let stem = nominalWord.replace(/[ःम्]$/, '');
+      const isNeuter = nominalWord.endsWith('म्') || nominalWord.endsWith('नम्');
 
-    if (isNama) {
-      // 7 Cases × 3 Numbers (Nominal Subanta Declension without Upasarga)
-      const isNeuter = base === 'ज्ञान';
       return {
         type: 'nama' as const,
-        title: `${base} (Subanta Nominal Declension)`,
-        subtitle: "७ Vibhaktis (Cases) × ३ Vacanas (Numbers) — No Upasarga applicable",
+        title: `${nominalWord} (Subanta Nominal Declension)`,
+        subtitle: "७ Vibhaktis (Cases) × ३ Vacanas (Numbers) — Name Word Paradigm",
         rows: [
           { 
             name: "Prathamā (Nominative)", 
             sanskritName: "प्रथमा", 
             meaning: "Subject / Kartā", 
             forms: isNeuter 
-              ? [`${base}म्`, `${base}े`, `${base}ानि`]
-              : [`${base}ः`, `${base}ौ`, `${base}ाः`]
+              ? [`${stem}म्`, `${stem}े`, `${stem}ानि`] 
+              : [`${stem}ः`, `${stem}ौ`, `${stem}ाः`] 
           },
           { 
             name: "Dvitīyā (Accusative)", 
             sanskritName: "द्वितीया", 
             meaning: "Direct Object / Karma", 
-            forms: isNeuter
-              ? [`${base}म्`, `${base}े`, `${base}ानि`]
-              : [`${base}म्`, `${base}ौ`, `${base}ान्`] 
+            forms: isNeuter 
+              ? [`${stem}म्`, `${stem}े`, `${stem}ानि`] 
+              : [`${stem}म्`, `${stem}ौ`, `${stem}ान्`] 
           },
           { 
             name: "Tṛtīyā (Instrumental)", 
             sanskritName: "तृतीया", 
             meaning: "By / With (Karaṇa)", 
-            forms: [`${base}ेण`, `${base}ाभ्याम्`, `${base}ैः`] 
+            forms: [`${stem}ेण`, `${stem}ाभ्याम्`, `${stem}ैः`] 
           },
           { 
             name: "Caturthī (Dative)", 
             sanskritName: "चतुर्थी", 
             meaning: "For / Unto (Sampradāna)", 
-            forms: [`${base}ाय`, `${base}ाभ्याम्`, `${base}ेभ्यः`] 
+            forms: [`${stem}ाय`, `${stem}ाभ्याम्`, `${stem}ेभ्यः`] 
           },
           { 
             name: "Pañcamī (Ablative)", 
             sanskritName: "पञ्चमी", 
-            meaning: "From / Due to (Apādāna)", 
-            forms: [`${base}ात्`, `${base}ाभ्याम्`, `${base}ेभ्यः`] 
+            meaning: "From / Separation (Apādāna)", 
+            forms: [`${stem}ात्`, `${stem}ाभ्याम्`, `${stem}ेभ्यः`] 
           },
           { 
             name: "Ṣaṣṭhī (Genitive)", 
             sanskritName: "षष्ठी", 
             meaning: "Of / Belonging to (Sambandha)", 
-            forms: [`${base}स्य`, `${base}योः`, `${base}ानाम्`] 
+            forms: [`${stem}स्य`, `${stem}योः`, `${stem}ानाम्`] 
           },
           { 
             name: "Saptamī (Locative)", 
             sanskritName: "सप्तमी", 
             meaning: "In / At / Upon (Adhikaraṇa)", 
-            forms: [`${base}े`, `${base}योः`, `${base}ेषु`] 
+            forms: [`${stem}े`, `${stem}योः`, `${stem}ेषु`] 
           }
         ]
       };
     } else {
-      // 3 Persons × 3 Numbers (Tiṅanta Verbal Conjugation)
-      const isAtmanepada = currentResult.sanskrit.endsWith('ते') || currentDhatu.atmanepada;
-      const prefixStem = hasPrefix ? prefix : '';
-      const matrixTitle = hasPrefix 
-        ? `${prefix} + ${base} (Tiṅanta Verbal Conjugation)`
-        : `${base} (Pure Tiṅanta Conjugation — Unprefixed)`;
+      // 3 PERSONS × 3 NUMBERS (3 × 3 Verbal Grid)
+      const actionWord = derivedPair.actionWord.sanskrit;
+      const isAtmanepada = actionWord.endsWith('ते') || currentDhatu.atmanepada;
+      let base = actionWord.replace(/(ति|ते)$/, '');
 
       return {
         type: 'kriya' as const,
-        title: matrixTitle,
-        subtitle: isAtmanepada ? "Laṭ Lakāra (Present Ātmanepada)" : "Laṭ Lakāra (Present Parasmaipada)",
+        title: `${actionWord} (Tiṅanta Verbal Conjugation)`,
+        subtitle: isAtmanepada 
+          ? "३ Puruṣas × ३ Vacanas — Laṭ Lakāra (Present Ātmanepada)" 
+          : "३ Puruṣas × ३ Vacanas — Laṭ Lakāra (Present Parasmaipada)",
         rows: [
           { 
             name: "Prathama Puruṣa (3rd Person)", 
             sanskritName: "प्रथमपुरुषः", 
             meaning: "He / She / They", 
             forms: isAtmanepada 
-              ? [`${prefixStem}${base}ते`, `${prefixStem}${base}ेते`, `${prefixStem}${base}न्ते`]
-              : [currentResult.sanskrit, `${prefixStem}${base}तः`, `${prefixStem}${base}न्ति`]
+              ? [`${base}ते`, `${base}ेते`, `${base}न्ते`] 
+              : [`${base}ति`, `${base}तः`, `${base}न्ति`] 
           },
           { 
             name: "Madhyama Puruṣa (2nd Person)", 
             sanskritName: "मध्यमपुरुषः", 
             meaning: "You (singular/dual/plural)", 
             forms: isAtmanepada 
-              ? [`${prefixStem}${base}से`, `${prefixStem}${base}ेथे`, `${prefixStem}${base}ध्वे`]
-              : [`${prefixStem}${base}सि`, `${prefixStem}${base}थः`, `${prefixStem}${base}थ`]
+              ? [`${base}से`, `${base}ेथे`, `${base}ध्वे`] 
+              : [`${base}सि`, `${base}थः`, `${base}थ`] 
           },
           { 
             name: "Uttama Puruṣa (1st Person)", 
             sanskritName: "उत्तमपुरुषः", 
             meaning: "I / We two / We all", 
             forms: isAtmanepada 
-              ? [`${prefixStem}${base}े`, `${prefixStem}${base}ावहे`, `${prefixStem}${base}ामहे`]
-              : [`${prefixStem}${base}मि`, `${prefixStem}${base}ावः`, `${prefixStem}${base}ामः`]
+              ? [`${base}े`, `${base}ावहे`, `${base}ामहे`] 
+              : [`${base}मि`, `${base}ावः`, `${base}ामः`] 
           }
         ]
       };
     }
-  }, [currentUpasarga, currentDhatu, currentResult]);
+  }, [suffixTargetType, derivedPair, currentDhatu]);
 
   const activeMatrixRow = dynamicMatrixData.rows[selectedRowIndex % dynamicMatrixData.rows.length];
   const activeMatrixCellForm = activeMatrixRow.forms[selectedColIndex % 3];
 
   // Dynamic Etymology Data
   const currentEtymology: EtymologyData = useMemo(() => {
-    // If nominal stem -> Pāṇinian explanation of why Upasargas cannot attach
-    if (!currentDhatu.canHavePrefix) {
-      return {
-        sutra: "उपसर्गाः क्रियायोगे (१.४.५९) & प्रातिपदिकार्थलिङ्गपरिमाणवचनमात्रे प्रथमा (२.३.४६)",
-        sutraNumber: "अष्टाध्यायी १.४.५९ / २.३.४६",
-        sutraType: "संज्ञा-सूत्रम् (Definition of Scope)",
-        sutraExplanation: `Pāṇini defines in sūtra १.४.५९ that the twenty-two particles ('pra', 'parā', etc.) receive the designation 'Upasarga' ONLY when joined with an action/verbal root ('क्रियायोगे'). Because '${currentDhatu.sanskrit}' is an Ajanta Prātipadika (Nominal Noun Stem) and not a Dhātu, it cannot take verbal Upasargas. The prefix dial is dynamically disabled and set to 'None'.`,
-        derivationSteps: [
-          {
-            step: 1,
-            title: "Prātipadika Classification",
-            sutraRule: "अर्थवदधातुरप्रत्ययः प्रातिपदिकम् (१.२.४५)",
-            description: `'${currentDhatu.sanskrit}' is defined as a meaningful noun stem devoid of verbal root affixes.`,
-            intermediate: currentDhatu.sanskrit
-          },
-          {
-            step: 2,
-            title: "Upasarga Disqualification",
-            sutraRule: "उपसर्गाः क्रियायोगे (१.४.५९)",
-            description: "Upasargas require 'kriyāyoga' (connection with verbal action). In nominal stems, no Upasarga can be prefixed.",
-            intermediate: `विना-उपसर्गम् (None)`
-          },
-          {
-            step: 3,
-            title: "Subanta Pada Completion",
-            sutraRule: "सुप्तिङन्तं पदम् (१.४.१४)",
-            description: `Inflected with nominal case terminations (Sup), producing independent communicative noun padas like '${currentResult.sanskrit}'.`,
-            intermediate: currentResult.sanskrit
-          }
-        ],
-        poeticNuance: `A noun stem in Sanskrit is a self-luminous ontological substance, standing in its own dignity without the directional modification of verbal prefixes.`,
-        literaryContext: `Found throughout Sanskrit grammar to establish the clear boundary between Nāma (nouns) and Ākhyāta (verbs).`,
-        exampleSentence: {
-          sanskrit: `${currentDhatu.sanskrit}ः सदा विजयते धर्मरक्षकः।`,
-          iast: `${currentDhatu.iast}ḥ sadā vijayate dharmarakṣakaḥ.`,
-          translation: `The noble entity shines triumphant as the eternal protector of righteousness.`,
-          source: "Classical Traditional Shloka"
-        }
-      };
-    }
+    const isNama = suffixTargetType === 'nama';
+    const sutraTitle = isNama
+      ? "कृत्तद्धितसमासाश्च (१.२.४६) & प्रातिपदिकार्थलिङ्गपरिमाणवचनमात्रे प्रथमा (२.३.४६)"
+      : "तिप्तस्झिसिप्थस्थमिब्वस्मस्तातांझथासाथांध्वमिड्वहिमहिङ् (३.४.७८) & कर्तरि शप् (३.१.६८)";
 
-    // If verbal root
-    const key = `${currentUpasarga.sanskrit}-${currentDhatu.sanskrit}`;
     return {
-      sutra: currentUpasarga.isNone 
-        ? "भूवादयो धातवः (१.३.१) & कर्तरि शप् (३.१.६८)" 
-        : `उपसर्गाः क्रियायोगे (१.४.५९) — [${currentUpasarga.sanskrit}]`,
-      sutraNumber: currentUpasarga.isNone ? "अष्टाध्यायी १.३.१" : "अष्टाध्यायी १.४.५९",
-      sutraType: currentUpasarga.isNone ? "धातु-संज्ञा / सार्वधातुकम्" : "उपसर्ग-प्रक्रिया (Semantic Shift Rule)",
-      sutraExplanation: currentUpasarga.isNone
-        ? `The root sound '${currentDhatu.sanskrit}' functions directly as a pure radical verbal base (केवल-धातु) inflecting in the present tense (Laṭ).`
-        : `The Upasarga '${currentUpasarga.sanskrit}' (${currentUpasarga.meaning}) combines with root '${currentDhatu.sanskrit}' (${currentDhatu.meaning}), pulling the innate action into novel contextual semantics.`,
+      sutra: sutraTitle,
+      sutraNumber: isNama ? "अष्टाध्यायी १.२.४६ / २.३.४६" : "अष्टाध्यायी ३.४.७८ / ३.१.६८",
+      sutraType: isNama ? "सुबन्त-प्रक्रिया (Nominal Inflection)" : "तिङन्त-प्रक्रिया (Verbal Conjugation)",
+      sutraExplanation: isNama
+        ? `The root '${currentDhatu.sanskrit}' combines with nominal affix to form the Name Word '${currentResult.sanskrit}'. Pāṇinian sūtra १.२.४६ confers Prātipadika status, enabling the 21 nominal case endings (Sup) in a 7 × 3 matrix.`
+        : `The root '${currentDhatu.sanskrit}' takes the verbal personal terminations (Tiṅ) to form Action Word '${currentResult.sanskrit}', conjugating into the 3 Persons × 3 Numbers (3 × 3 matrix).`,
       derivationSteps: [
         {
           step: 1,
-          title: "Upasarga-Dhātu Saṃyoga",
-          sutraRule: "उपसर्गाः क्रियायोगे (१.४.५९)",
-          description: `The prefix '${currentUpasarga.sanskrit}' integrates with root '${currentDhatu.sanskrit}'.`,
-          intermediate: `${currentUpasarga.sanskrit} + ${currentDhatu.sanskrit}`
+          title: isNama ? "Kṛt/Nominal Affixation" : "Sarvadhātuka Tiṅ Affixation",
+          sutraRule: isNama ? "कृदतिङ् (३.१.९३)" : "कर्तरि शप् (३.१.६८)",
+          description: isNama 
+            ? `The root is converted to a nominal noun stem expressing the outcome or agent of action.`
+            : `The root receives the thematic affix 'Śap' for active voice inflection.`,
+          intermediate: `${currentUpasarga.isNone ? '' : currentUpasarga.sanskrit + ' + '}${currentDhatu.sanskrit}`
         },
         {
           step: 2,
-          title: "Vikaraṇa & Sandhi Adjustment",
-          sutraRule: "कर्तरि शप् (३.१.६८) / अचोऽन्त्यादि",
-          description: "Internal phonological harmony adjusts vowels and consonants between prefix and root.",
-          intermediate: `${currentUpasarga.sanskrit}${currentDhatu.sanskrit}`
+          title: "Morphophonemic Synthesis",
+          sutraRule: "अचोऽन्त्यादि टि / सार्वधातुके",
+          description: "Internal phonetic harmony fuses prefix, root radical vowels, and terminations.",
+          intermediate: currentResult.sanskrit
         },
         {
           step: 3,
-          title: "Pada Completion (सुप्तिङन्तं पदम्)",
-          sutraRule: "तिप्तस्झिसिप्थस्थ... (३.४.७८)",
-          description: `Inflected into final conjugated form '${currentResult.sanskrit}'.`,
-          intermediate: currentResult.sanskrit
+          title: isNama ? "7 × 3 Subanta Declension" : "3 × 3 Tiṅanta Conjugation",
+          sutraRule: "सुप्तिङन्तं पदम् (१.४.१४)",
+          description: isNama
+            ? `Inflected into the 7 cases (Vibhaktis) across singular, dual, and plural.`
+            : `Conjugated into 3 persons (Prathama, Madhyama, Uttama) across 3 numbers.`,
+          intermediate: dynamicMatrixData.title
         }
       ],
-      poeticNuance: `उपसर्गेण धात्वर्थो बलादन्यत्र नीयते — As Patañjali observed, the prefix '${currentUpasarga.sanskrit}' transfigures the root '${currentDhatu.sanskrit}' to embody ${currentUpasarga.meaning}.`,
-      literaryContext: `Standard Pāṇinian morphological synthesis across the 22 classical Upasargas.`,
+      poeticNuance: isNama
+        ? `In Sanskrit ontology, a Name Word (नामपदम्) represents an established substance or realized state (सिद्धभाव), standing as an object of meditation.`
+        : `An Action Word (क्रियापदम्) captures unfolding dynamism (साध्यभाव), the cosmic flux of time, intentionality, and movement.`,
+      literaryContext: `Demonstrates the fundamental architectural duality in Pāṇini's grammar between Nāma and Ākhyāta.`,
       exampleSentence: {
-        sanskrit: `${currentResult.sanskrit} सुधीः धर्ममार्गे।`,
-        iast: `${currentResult.iast} sudhīḥ dharmamārge.`,
-        translation: `The wise soul walks and perseveres steadfastly on the path of truth.`,
-        source: "Classical Sanskrit Synthesis"
+        sanskrit: isNama 
+          ? `${currentResult.sanskrit} मङ्गलं ददाति विदुषां चेतसि।` 
+          : `${currentResult.sanskrit} धीरो जनः धर्ममार्गे।`,
+        iast: isNama 
+          ? `${currentResult.iast} maṅgalaṃ dadāti viduṣāṃ cetasi.` 
+          : `${currentResult.iast} dhīro janaḥ dharmamārge.`,
+        translation: isNama
+          ? `The sacred form '${currentResult.sanskrit}' confers auspicious clarity upon the minds of the wise.`
+          : `The steadfast being acts and rejoices firmly on the noble path.`,
+        source: "Classical Sanskrit Analysis"
       }
     };
-  }, [currentUpasarga, currentDhatu, currentResult]);
+  }, [suffixTargetType, currentDhatu, currentUpasarga, currentResult, dynamicMatrixData]);
 
   // Audio Speech Synthesis
   const speakSanskrit = useCallback((text: string) => {
@@ -945,7 +703,6 @@ export default function SanskritMorphEngine() {
       return;
     }
     setSavedUpasargaIndex((prev) => (prev + 1) % STANDARD_22_UPASARGAS.length);
-    setSuffixIndex(0);
   };
 
   // Root cycling
@@ -953,11 +710,11 @@ export default function SanskritMorphEngine() {
     if (dhatuMode === 'dial') {
       const nextIdx = (dhatuIndex + 1) % DHATUS.length;
       setDhatuIndex(nextIdx);
-      setSuffixIndex(0);
 
       const nextDhatu = DHATUS[nextIdx];
       if (!nextDhatu.canHavePrefix) {
-        showToast(`'${nextDhatu.sanskrit}' is a Nominal Stem (प्रातिपदिक). Prefix dial set to None.`);
+        setSuffixTargetType('nama');
+        showToast(`'${nextDhatu.sanskrit}' is a Nominal Stem (प्रातिपदिक). Matrix set to 7 × 3.`);
       }
     }
   };
@@ -975,9 +732,9 @@ export default function SanskritMorphEngine() {
       const prefixStr = currentUpasarga.isNone ? "(विना)" : currentUpasarga.sanskrit;
       newEntry = {
         id: `eq-${Date.now()}`,
-        sanskrit: `${prefixStr} + ${currentDhatu.sanskrit} = ${currentResult.sanskrit}`,
+        sanskrit: `${prefixStr} + ${currentDhatu.sanskrit} = ${currentResult.sanskrit} [${suffixTargetType === 'kriya' ? 'क्रिया' : 'नाम'}]`,
         iast: `${currentUpasarga.iast} + ${currentDhatu.iast} -> ${currentResult.iast}`,
-        meaning: currentResult.meaning,
+        meaning: `${currentResult.meaning} (${suffixTargetType === 'kriya' ? 'Action Word' : 'Name Word'})`,
         sourceType: 'equation',
         details: currentResult.context,
         savedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -995,7 +752,7 @@ export default function SanskritMorphEngine() {
     } else {
       newEntry = {
         id: `ety-${Date.now()}`,
-        sanskrit: `${currentDhatu.sanskrit} : ${currentEtymology.sutra}`,
+        sanskrit: `${currentResult.sanskrit} : ${currentEtymology.sutra}`,
         iast: currentEtymology.sutraNumber,
         meaning: currentEtymology.sutraExplanation.slice(0, 75) + "...",
         sourceType: 'etymology',
@@ -1058,10 +815,12 @@ export default function SanskritMorphEngine() {
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold tracking-tight text-white">Sanskrit Morph Engine</span>
-                <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/20">22 Upasargas</span>
+                <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/20">
+                  {suffixTargetType === 'kriya' ? 'Action (3×3)' : 'Name (7×3)'}
+                </span>
               </div>
               <p className="text-[10px] text-slate-400 font-mono tracking-wider">
-                PANINIAN EQUATION · 22 UPASARGAS · DYNAMIC MATRIX
+                MORPHOLOGICAL EQUATION · PARADIGM MATRIX · ETYMOLOGY
               </p>
             </div>
           </div>
@@ -1164,20 +923,20 @@ export default function SanskritMorphEngine() {
               <div className="text-center mb-6">
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-[11px] font-mono uppercase tracking-widest mb-3">
                   <Sparkles className="w-3 h-3 text-indigo-400" />
-                  <span>22 Traditional Upasargas · Dynamic Kriyāyoga Check</span>
+                  <span>Toggle Suffix Dial (Action vs Name) to Morph Paradigm Matrix</span>
                 </div>
                 <h2 className="text-2xl md:text-3xl font-light tracking-tight text-white font-serif">
                   Morphological Equation Studio
                 </h2>
                 <p className="text-xs text-slate-400 max-w-xl mx-auto mt-1">
-                  Pāṇini 1.4.59: <span className="text-indigo-300 font-serif font-semibold">उपसर्गाः क्रियायोगे</span> — Upasargas attach strictly to Dhātus (verbs). For Nominal stems (Prātipadika), the prefix dial automatically disables to None.
+                  Switch the suffix dial between <span className="text-indigo-300 font-medium">Action Word (क्रिया)</span> and <span className="text-purple-300 font-medium">Name Word (नाम)</span> to recompute and visually verify the resulting paradigm matrix.
                 </p>
               </div>
 
               {/* The Horizontal Formula Dial Architecture */}
               <div className="w-full flex flex-col lg:flex-row items-stretch justify-center gap-4 lg:gap-6 my-4">
                 
-                {/* 1. UPASARGA (PREFIX) DIAL - With 22 standard prefixes and dynamic None handling */}
+                {/* 1. UPASARGA (PREFIX) DIAL */}
                 <div 
                   onClick={cycleUpasarga}
                   className={`group relative flex-1 w-full max-w-sm p-6 rounded-2xl border transition-all flex flex-col items-center text-center backdrop-blur-md shadow-2xl ${
@@ -1237,7 +996,7 @@ export default function SanskritMorphEngine() {
                       </div>
                       <div className="text-xs font-mono text-slate-400 mb-2">उपसर्गरहित (No Upasarga)</div>
                       <div className="text-[11px] text-slate-500 leading-snug p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.05]">
-                        <span className="text-indigo-300 font-semibold">उपसर्गाः क्रियायोगे (१.४.५९):</span> Nominal stems (प्रातिपदिक) do not combine with verbal Upasargas.
+                        <span className="text-indigo-300 font-semibold">उपसर्गाः क्रियायोगे (१.४.५९):</span> Nominal stems do not take Upasargas.
                       </div>
                     </div>
                   )}
@@ -1317,7 +1076,10 @@ export default function SanskritMorphEngine() {
                         <input
                           type="checkbox"
                           checked={customIsNominal}
-                          onChange={(e) => setCustomIsNominal(e.target.checked)}
+                          onChange={(e) => {
+                            setCustomIsNominal(e.target.checked);
+                            if (e.target.checked) setSuffixTargetType('nama');
+                          }}
                           className="rounded bg-white/5 border-white/10 text-indigo-600 focus:ring-0"
                         />
                         <span>Nominal Noun Stem (No Prefix)</span>
@@ -1336,7 +1098,7 @@ export default function SanskritMorphEngine() {
 
                 <div className="text-2xl font-light text-slate-600 select-none self-center">=</div>
 
-                {/* 3. DERIVATIVE RESULT BLOCK (Navigates to Step 2) */}
+                {/* 3. SUFFIX DIAL: WITH HIGH-LEVEL TOGGLE (ACTION WORD VS NAME WORD) */}
                 <div 
                   onClick={() => setCurrentStep('matrix')}
                   className="group relative flex-1 w-full max-w-sm p-6 rounded-2xl bg-gradient-to-b from-indigo-950/35 via-indigo-900/10 to-transparent border border-indigo-500/35 hover:border-indigo-500/75 transition-all cursor-pointer flex flex-col items-center text-center backdrop-blur-md shadow-2xl"
@@ -1347,44 +1109,72 @@ export default function SanskritMorphEngine() {
                     <ArrowRight className="w-3 h-3" />
                   </div>
                   
-                  <div className="text-[11px] uppercase tracking-wider text-indigo-300 font-mono mb-1">
-                    Derivative Result (प्रत्यय)
+                  <div className="text-[11px] uppercase tracking-wider text-indigo-300 font-mono mb-2">
+                    Suffix Dial (प्रत्यय-प्रक्रिया)
                   </div>
-                  <div className="text-4xl md:text-5xl font-bold tracking-tight text-white my-3 group-hover:scale-105 transition-transform font-serif text-indigo-100">
+
+                  {/* HIGH-LEVEL TOGGLE: ACTION WORD (क्रियापदम्) vs NAME WORD (नामपदम्) */}
+                  <div 
+                    onClick={(e) => e.stopPropagation()} 
+                    className="w-full mb-3 p-1 rounded-xl bg-black/40 border border-white/10 flex items-center gap-1 shadow-inner backdrop-blur-sm"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSuffixTargetType('kriya');
+                        showToast("Suffix set to Action Word: Paradigm Matrix is now 3 × 3 Verbal Grid.");
+                      }}
+                      className={`flex-1 py-1.5 px-2.5 rounded-lg text-[11px] font-medium transition-all flex items-center justify-center gap-1.5 ${
+                        suffixTargetType === 'kriya'
+                          ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-md shadow-indigo-600/30 font-semibold'
+                          : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
+                      }`}
+                    >
+                      <Activity className="w-3.5 h-3.5" />
+                      <span>Action Word (क्रिया)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSuffixTargetType('nama');
+                        showToast("Suffix set to Name Word: Paradigm Matrix is now 7 × 3 Nominal Grid.");
+                      }}
+                      className={`flex-1 py-1.5 px-2.5 rounded-lg text-[11px] font-medium transition-all flex items-center justify-center gap-1.5 ${
+                        suffixTargetType === 'nama'
+                          ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-600/30 font-semibold'
+                          : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
+                      }`}
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Name Word (नाम)</span>
+                    </button>
+                  </div>
+
+                  {/* Derivative Result Display */}
+                  <div className="text-4xl md:text-5xl font-bold tracking-tight text-white my-2 group-hover:scale-105 transition-transform font-serif text-indigo-100">
                     {currentResult.sanskrit}
                   </div>
                   <div className="text-sm font-mono text-indigo-300 mb-1">{currentResult.iast}</div>
-                  <div className="text-xs text-slate-200 italic min-h-[32px] flex items-center justify-center">
+                  <div className="text-xs text-slate-200 italic min-h-[30px] flex items-center justify-center">
                     &ldquo;{currentResult.meaning}&rdquo;
                   </div>
 
-                  <div className="mt-3 pt-3 border-t border-indigo-500/20 w-full text-[11px] text-indigo-300/90 flex items-center justify-center gap-1">
-                    <Table className="w-3 h-3" />
-                    <span>Click to open Paradigm Matrix</span>
+                  {/* Visual Verification Banner in Suffix Dial */}
+                  <div className="mt-3 pt-3 border-t border-indigo-500/20 w-full flex flex-col items-center gap-1">
+                    <div className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/20">
+                      {suffixTargetType === 'kriya' 
+                        ? "Matrix: 3 Persons × 3 Numbers (3 × 3)" 
+                        : "Matrix: 7 Cases × 3 Numbers (7 × 3)"}
+                    </div>
+                    <span className="text-[11px] text-indigo-300/80 flex items-center gap-1 mt-0.5">
+                      <Table className="w-3 h-3" />
+                      <span>Click block to view matrix table</span>
+                    </span>
                   </div>
                 </div>
 
               </div>
-
-              {/* Quick Cycle Derivation Pill Bar */}
-              {availableSuffixes.length > 1 && (
-                <div className="flex items-center gap-2 mt-2">
-                  <span className="text-[11px] text-slate-500 font-mono">Derivations:</span>
-                  {availableSuffixes.map((suffix, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => setSuffixIndex(idx)}
-                      className={`text-xs px-2.5 py-1 rounded-lg font-serif transition-colors ${
-                        suffixIndex % availableSuffixes.length === idx 
-                          ? 'bg-indigo-600/40 border border-indigo-500/50 text-white' 
-                          : 'bg-white/[0.03] text-slate-400 hover:text-white'
-                      }`}
-                    >
-                      {suffix.sanskrit}
-                    </button>
-                  ))}
-                </div>
-              )}
 
               {/* Equation Action Controls */}
               <div className="flex flex-wrap items-center justify-center gap-3.5 mt-8">
@@ -1404,7 +1194,7 @@ export default function SanskritMorphEngine() {
                   className="flex items-center gap-2 px-5 py-2.5 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition-all shadow-lg shadow-indigo-600/25"
                 >
                   <Grid className="w-3.5 h-3.5" />
-                  <span>View Paradigm Matrix Table</span>
+                  <span>View Paradigm Matrix ({suffixTargetType === 'kriya' ? '3 × 3' : '7 × 3'})</span>
                 </button>
 
                 {/* Navigate to Step 3 */}
@@ -1430,8 +1220,8 @@ export default function SanskritMorphEngine() {
               transition={{ duration: 0.25 }}
               className="w-full flex flex-col items-center"
             >
-              {/* Matrix Header Navigation Controls */}
-              <div className="w-full flex items-center justify-between gap-4 mb-6">
+              {/* Matrix Header Navigation Controls & Synced High-Level Toggle */}
+              <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
                 <button
                   onClick={() => setCurrentStep('equation')}
                   className="flex items-center gap-2 px-3.5 py-1.5 text-xs font-medium bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.08] rounded-xl transition-colors text-slate-300"
@@ -1440,8 +1230,41 @@ export default function SanskritMorphEngine() {
                   <span>Back to Step 1: Equation</span>
                 </button>
 
+                {/* SYNCED HIGH-LEVEL TOGGLE: Users can toggle right inside the Matrix view! */}
+                <div className="flex items-center p-1 rounded-xl bg-black/40 border border-white/10 shadow-inner">
+                  <button
+                    onClick={() => {
+                      setSuffixTargetType('kriya');
+                      showToast("Matrix dynamically switched to 3 × 3 Action Word (Verbal) Conjugation.");
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-all ${
+                      suffixTargetType === 'kriya'
+                        ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white font-semibold shadow-md'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Activity className="w-3.5 h-3.5" />
+                    <span>Action Word (3 × 3)</span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setSuffixTargetType('nama');
+                      showToast("Matrix dynamically switched to 7 × 3 Name Word (Nominal) Declension.");
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-all ${
+                      suffixTargetType === 'nama'
+                        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold shadow-md'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>Name Word (7 × 3)</span>
+                  </button>
+                </div>
+
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-mono text-indigo-400 uppercase tracking-widest px-2 py-0.5 rounded bg-indigo-500/10 border border-indigo-500/20">
+                  <span className="text-[11px] font-mono text-indigo-400 uppercase tracking-widest px-2.5 py-1 rounded-xl bg-indigo-500/10 border border-indigo-500/20">
                     {dynamicMatrixData.type === 'nama' ? '7 × 3 Nominal Grid' : '3 × 3 Verbal Grid'}
                   </span>
                   <button
@@ -1464,7 +1287,7 @@ export default function SanskritMorphEngine() {
                 </p>
               </div>
 
-              {/* CLUTTER-FREE TRANSPARENT MATRIX GRID: Zero heavy borders, pure ambient aesthetic */}
+              {/* CLUTTER-FREE TRANSPARENT MATRIX GRID: Dynamically rendered based on toggle */}
               <div className="w-full overflow-x-auto my-2 pb-4">
                 <div className="min-w-[720px] grid grid-cols-4 gap-2 text-sm">
                   
@@ -1534,7 +1357,7 @@ export default function SanskritMorphEngine() {
               <div className="w-full max-w-3xl mt-4 p-6 rounded-2xl bg-gradient-to-b from-white/[0.03] to-transparent border border-white/[0.06] flex flex-col sm:flex-row items-center justify-between gap-4 backdrop-blur-md">
                 <div>
                   <span className="text-[10px] font-mono uppercase tracking-widest text-indigo-400 block mb-1">
-                    SELECTED PARADIGM CELL
+                    SELECTED PARADIGM CELL ({suffixTargetType === 'kriya' ? 'ACTION' : 'NAME'})
                   </span>
                   <div className="flex items-baseline gap-3">
                     <span className="text-3xl font-serif font-bold text-white">{activeMatrixCellForm}</span>
@@ -1588,7 +1411,7 @@ export default function SanskritMorphEngine() {
 
                 <div className="inline-flex items-center gap-1.5 text-[11px] font-mono text-indigo-400 px-2.5 py-1 rounded bg-indigo-500/10 border border-indigo-500/20">
                   <BookOpen className="w-3.5 h-3.5" />
-                  <span>Pāṇinian Aṣṭādhyāyī Analysis</span>
+                  <span>Pāṇinian Aṣṭādhyāyī Analysis ({suffixTargetType === 'kriya' ? 'Tiṅanta' : 'Subanta'})</span>
                 </div>
               </div>
 
@@ -1598,10 +1421,10 @@ export default function SanskritMorphEngine() {
                   MORPHOLOGICAL DERIVATION & SŪTRAS
                 </span>
                 <h2 className="text-2xl md:text-3xl font-light tracking-tight text-white font-serif">
-                  {currentUpasarga.isNone ? "केवल-धातु / प्रातिपदिक" : `${currentUpasarga.sanskrit} + ${currentDhatu.sanskrit}`} = {currentResult.sanskrit}
+                  {currentUpasarga.isNone ? "केवल-धातु" : `${currentUpasarga.sanskrit} + ${currentDhatu.sanskrit}`} = {currentResult.sanskrit}
                 </h2>
                 <p className="text-xs text-slate-400 mt-1">
-                  Systematic deconstruction according to canonical grammatical sūtras of Pāṇini.
+                  Morphological deconstruction for <span className="text-indigo-300 font-semibold">{suffixTargetType === 'kriya' ? 'Action Word (क्रियापदम्)' : 'Name Word (नामपदम्)'}</span> according to Pāṇinian sūtras.
                 </p>
               </div>
 
@@ -1676,7 +1499,7 @@ export default function SanskritMorphEngine() {
                     <div className="flex items-center gap-2 mb-2">
                       <Feather className="w-4 h-4 text-indigo-400" />
                       <h4 className="text-sm font-mono uppercase tracking-wider text-slate-300 font-semibold">
-                        Semantic Nuance & Pāṇinian Rule Application
+                        Ontological Nuance & Semantic Transfiguration
                       </h4>
                     </div>
                     <p className="text-sm text-slate-300 italic font-serif leading-relaxed">
@@ -1775,7 +1598,6 @@ export default function SanskritMorphEngine() {
                       key={idx}
                       onClick={() => {
                         setSavedUpasargaIndex(idx);
-                        setSuffixIndex(0);
                         setIsPrefixQuickSelectOpen(false);
                       }}
                       className={`p-3.5 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
@@ -1985,25 +1807,17 @@ export default function SanskritMorphEngine() {
             <p className="text-xs md:text-sm text-slate-300 font-serif leading-relaxed">
               {currentStep === 'equation' && (
                 <>
-                  {!currentDhatu.canHavePrefix ? (
-                    <>
-                      &ldquo;Selected root <span className="text-indigo-300 font-sans font-semibold">&lsquo;{currentDhatu.sanskrit}&rsquo;</span> is a Prātipadika (Nominal Stem) and cannot take verbal Upasargas per <span className="text-white font-sans font-bold">उपसर्गाः क्रियायोगे (१.४.५९)</span>. Prefix dial is set to None.&rdquo;
-                    </>
-                  ) : (
-                    <>
-                      &ldquo;Root sound <span className="text-indigo-300 font-sans font-semibold">&lsquo;{currentDhatu.sanskrit}&rsquo;</span> ({currentDhatu.meaning}) modified by Upasarga <span className="text-indigo-300 font-sans font-semibold">&lsquo;{currentUpasarga.sanskrit}&rsquo;</span> ({currentUpasarga.meaning}) engenders <span className="text-white font-sans font-bold">&lsquo;{currentResult.sanskrit}&rsquo;</span>.&rdquo;
-                    </>
-                  )}
+                  &ldquo;Suffix dial configured for <span className="text-indigo-300 font-sans font-semibold">{suffixTargetType === 'kriya' ? 'Action Word (क्रियापदम्)' : 'Name Word (नामपदम्)'}</span>. Root <span className="text-indigo-300 font-sans font-semibold">&lsquo;{currentDhatu.sanskrit}&rsquo;</span> with prefix <span className="text-indigo-300 font-sans font-semibold">&lsquo;{currentUpasarga.sanskrit}&rsquo;</span> produces <span className="text-white font-sans font-bold">&lsquo;{currentResult.sanskrit}&rsquo;</span>. Yields {suffixTargetType === 'kriya' ? '3 × 3 verbal matrix' : '7 × 3 nominal matrix'}.&rdquo;
                 </>
               )}
               {currentStep === 'matrix' && (
                 <>
-                  &ldquo;Inspecting <span className="text-indigo-300 font-sans font-semibold">{dynamicMatrixData.title}</span>. Active cell <span className="text-white font-sans font-bold">&lsquo;{activeMatrixCellForm}&rsquo;</span> expresses <span className="text-indigo-300 font-sans font-semibold">{activeMatrixRow.name}</span> in <span className="text-indigo-300 font-sans font-semibold">{VACANA_HEADERS[selectedColIndex].sanskrit}</span>.&rdquo;
+                  &ldquo;Visualizing <span className="text-indigo-300 font-sans font-semibold">{dynamicMatrixData.title}</span> ({suffixTargetType === 'kriya' ? '3 × 3 Action Conjugation' : '7 × 3 Name Declension'}). Selected cell <span className="text-white font-sans font-bold">&lsquo;{activeMatrixCellForm}&rsquo;</span>.&rdquo;
                 </>
               )}
               {currentStep === 'etymology' && (
                 <>
-                  &ldquo;Canonical Pāṇinian analysis: governed by <span className="text-indigo-300 font-sans font-semibold">{currentEtymology.sutraNumber}</span> &lsquo;{currentEtymology.sutra}&rsquo;. Demonstrates semantic transformation into <span className="text-white font-sans font-bold">&lsquo;{currentResult.sanskrit}&rsquo;</span>.&rdquo;
+                  &ldquo;Pāṇinian analysis for <span className="text-indigo-300 font-sans font-semibold">{suffixTargetType === 'kriya' ? 'Tiṅanta (Action)' : 'Subanta (Name)'}</span>: governed by <span className="text-indigo-300 font-sans font-semibold">{currentEtymology.sutraNumber}</span>. Demonstrates semantic culmination into <span className="text-white font-sans font-bold">&lsquo;{currentResult.sanskrit}&rsquo;</span>.&rdquo;
                 </>
               )}
             </p>
