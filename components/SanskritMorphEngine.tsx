@@ -6,7 +6,8 @@ import {
   Volume2, VolumeX, Sparkles, Bookmark, 
   Keyboard, Compass, Mic, Atom, BookOpen, Grid, Layers, ArrowRight, ArrowLeft,
   Check, Copy, Trash2, X, ScrollText, Feather, Activity,
-  Workflow, Table, BookMarked, ShieldAlert, ChevronDown, ChevronLeft, ChevronRight
+  Workflow, Table, BookMarked, ShieldAlert, ChevronDown, ChevronLeft, ChevronRight,
+  Lock, Unlock
 } from 'lucide-react';
 
 interface Upasarga {
@@ -110,14 +111,26 @@ const NONE_UPASARGA: Upasarga = {
   sanskrit: "—",
   iast: "none",
   meaning: "No Prefix (उपसर्गरहित / केवल)",
-  nuance: "Nominal stems cannot take verbal Upasargas per Pāṇini 1.4.59 ('उपसर्गाः क्रियायोगे'). Unprefixed base root.",
+  nuance: "Unprefixed base root form. Per Pāṇini 1.4.59 ('उपसर्गाः क्रियायोगे'), nominal stems cannot take verbal Upasargas.",
   isNone: true
+};
+
+const NONE_DHATU: Dhatu = {
+  sanskrit: "—",
+  iast: "none",
+  meaning: "No root word selected",
+  gana: "Awaiting selection",
+  type: "nama",
+  canHavePrefix: false,
+  baseNoun: "—",
+  nounGender: "masc"
 };
 
 // -------------------------------------------------------------
 // Canonical Roots & Nominal Stems
 // -------------------------------------------------------------
 const DHATUS: Dhatu[] = [
+  // 10 Verbal Roots (क्रियावाचक धातु — Allow Upasargas)
   { 
     sanskrit: "रम्", 
     iast: "ram", 
@@ -238,7 +251,7 @@ const DHATUS: Dhatu[] = [
     baseNoun: "ज्ञानम्",
     nounGender: "neut"
   },
-  // Nominal Noun Stems (Prātipadika)
+  // 3 Nominal Noun Stems (प्रातिपदिक — Upasarga Inactive & Locked to None)
   { 
     sanskrit: "राम", 
     iast: "rāma", 
@@ -281,12 +294,44 @@ const VACANA_HEADERS = [
 // Synthesizes MULTIPLE Action Word (Tiṅanta) and Name Word (Subanta) Options
 // -------------------------------------------------------------------
 function getDerivedOptions(upasarga: Upasarga, dhatu: Dhatu): { actionWords: SuffixOption[]; nameWords: SuffixOption[] } {
+  // If no root word selected
+  if (dhatu.sanskrit === "—") {
+    return {
+      actionWords: [
+        {
+          id: 'act-none',
+          sanskrit: "—",
+          iast: "none",
+          meaning: "Select a root word in Step 1 to derive forms",
+          context: "Awaiting Root Selection",
+          tag: "क्रियापदम्",
+          category: "tinanta",
+          targetType: "kriya",
+          tenseMood: "Awaiting Selection"
+        }
+      ],
+      nameWords: [
+        {
+          id: 'nom-none',
+          sanskrit: "—",
+          iast: "none",
+          meaning: "Select a root word in Step 1 to derive forms",
+          context: "Awaiting Root Selection",
+          tag: "नामपदम्",
+          category: "subanta",
+          targetType: "nama",
+          gender: "masc"
+        }
+      ]
+    };
+  }
+
   const isNone = upasarga.isNone || !dhatu.canHavePrefix;
   const pDev = isNone ? '' : upasarga.sanskrit;
   const pIast = isNone ? '' : upasarga.iast.replace(/ \(.*\)/, '');
   const dDev = dhatu.sanskrit;
 
-  // Inherent nominal stem
+  // Inherent nominal stem (Prātipadika: e.g. राम, देव, ज्ञान)
   if (dhatu.type === 'nama' || !dhatu.canHavePrefix) {
     const isNeuter = dDev === 'ज्ञान';
     const mainNom = isNeuter ? `${dDev}म्` : `${dDev}ः`;
@@ -371,6 +416,85 @@ function getDerivedOptions(upasarga: Upasarga, dhatu: Dhatu): { actionWords: Suf
   const comboKey = `${pDev || 'none'}-${dDev}`;
 
   const SPECIAL_MAP: Record<string, { actionWords: SuffixOption[]; nameWords: SuffixOption[] }> = {
+    // Unprefixed Verbal Roots (केवल-धातु)
+    "none-रम्": {
+      actionWords: [
+        { id: 'act-1', sanskrit: "रमते", iast: "ramate", meaning: "he delights, sports, rejoices", context: "Present Indicative (Laṭ, 3rd Person Ātmanepada)", tag: "लट् (Present)", category: "tinanta", targetType: "kriya", tenseMood: "Present (Laṭ)", atmanepada: true },
+        { id: 'act-2', sanskrit: "रमताम्", iast: "ramatām", meaning: "let him rejoice / delight", context: "Imperative Mood (Loṭ, 3rd Person)", tag: "लोट् (Imperative)", category: "tinanta", targetType: "kriya", tenseMood: "Imperative (Loṭ)", atmanepada: true },
+        { id: 'act-3', sanskrit: "रमेत", iast: "rameta", meaning: "may he take delight in righteousness", context: "Potential / Optative (Vidčiliṅ)", tag: "विधिलिङ् (Optative)", category: "tinanta", targetType: "kriya", tenseMood: "Optative (Vidčiliṅ)", atmanepada: true },
+        { id: 'act-4', sanskrit: "रेमे", iast: "reme", meaning: "he took delight (Past)", context: "Perfect Past (Liṭ Lakāra)", tag: "लिट् (Past)", category: "tinanta", targetType: "kriya", tenseMood: "Perfect (Liṭ)", atmanepada: true }
+      ],
+      nameWords: [
+        { id: 'nom-1', sanskrit: "रामः", iast: "rāmaḥ", meaning: "charming one, delight, Sri Rama", context: "Primary Nominal Derivative (Ghañ Pratyaya)", tag: "घञ् (Charming)", category: "subanta", targetType: "nama", gender: "masc" },
+        { id: 'nom-2', sanskrit: "रमणम्", iast: "ramaṇam", meaning: "pleasing, the act of delighting", context: "Action Noun (Lyuṭ Pratyaya)", tag: "ल्युट् (Pleasing)", category: "subanta", targetType: "nama", gender: "neut" },
+        { id: 'nom-3', sanskrit: "रतिः", iast: "ratiḥ", meaning: "affection, pleasure, devotional joy", context: "Feminine Action Noun (Ktin Pratyaya)", tag: "क्तिन् (Devotion)", category: "subanta", targetType: "nama", gender: "fem" },
+        { id: 'nom-4', sanskrit: "रतः", iast: "rataḥ", meaning: "absorbed, engrossed, delighted", context: "Past Passive Participle (Kta)", tag: "क्त (Engrossed)", category: "subanta", targetType: "nama", gender: "masc" }
+      ]
+    },
+    "none-गम्": {
+      actionWords: [
+        { id: 'act-1', sanskrit: "गच्छति", iast: "gacchati", meaning: "he goes, moves, attains", context: "Present Indicative (Laṭ, 3rd Person)", tag: "लट् (Present)", category: "tinanta", targetType: "kriya", tenseMood: "Present (Laṭ)", atmanepada: false },
+        { id: 'act-2', sanskrit: "गच्छतु", iast: "gacchatu", meaning: "let him go / depart", context: "Imperative Mood (Loṭ)", tag: "लोट् (Imperative)", category: "tinanta", targetType: "kriya", tenseMood: "Imperative (Loṭ)", atmanepada: false },
+        { id: 'act-3', sanskrit: "गच्छेत्", iast: "gacchet", meaning: "he should go / proceed", context: "Potential Mood (Vidčiliṅ)", tag: "विधिलिङ् (Optative)", category: "tinanta", targetType: "kriya", tenseMood: "Optative (Vidčiliṅ)", atmanepada: false },
+        { id: 'act-4', sanskrit: "जगाम", iast: "jagāma", meaning: "he went (Remote Past)", context: "Perfect Past (Liṭ Lakāra)", tag: "लिट् (Past)", category: "tinanta", targetType: "kriya", tenseMood: "Perfect (Liṭ)", atmanepada: false }
+      ],
+      nameWords: [
+        { id: 'nom-1', sanskrit: "गमनम्", iast: "gamanam", meaning: "going, departure, journey", context: "Action Noun (Lyuṭ)", tag: "ल्युट् (Journey)", category: "subanta", targetType: "nama", gender: "neut" },
+        { id: 'nom-2', sanskrit: "गतिः", iast: "gatiḥ", meaning: "path, movement, spiritual refuge", context: "Feminine Action Noun (Ktin)", tag: "क्तिन् (Refuge)", category: "subanta", targetType: "nama", gender: "fem" },
+        { id: 'nom-3', sanskrit: "गतः", iast: "gataḥ", meaning: "one who has reached / gone", context: "Past Participle (Kta)", tag: "क्त (Reached)", category: "subanta", targetType: "nama", gender: "masc" }
+      ]
+    },
+    "none-पठ्": {
+      actionWords: [
+        { id: 'act-1', sanskrit: "पठति", iast: "paṭhati", meaning: "he recites, reads, studies", context: "Present Indicative (Laṭ)", tag: "लट् (Present)", category: "tinanta", targetType: "kriya", tenseMood: "Present (Laṭ)", atmanepada: false },
+        { id: 'act-2', sanskrit: "पठतु", iast: "paṭhatu", meaning: "let him recite aloud", context: "Imperative Mood (Loṭ)", tag: "लोट् (Imperative)", category: "tinanta", targetType: "kriya", tenseMood: "Imperative (Loṭ)", atmanepada: false },
+        { id: 'act-3', sanskrit: "पठेत्", iast: "paṭhet", meaning: "he should study the sacred text", context: "Potential Mood (Vidčiliṅ)", tag: "विधिलिङ् (Optative)", category: "tinanta", targetType: "kriya", tenseMood: "Optative (Vidčiliṅ)", atmanepada: false }
+      ],
+      nameWords: [
+        { id: 'nom-1', sanskrit: "पाठः", iast: "pāṭhaḥ", meaning: "reading, lesson, textual recitation", context: "Action Noun (Ghañ)", tag: "घञ् (Lesson)", category: "subanta", targetType: "nama", gender: "masc" },
+        { id: 'nom-2', sanskrit: "पठनम्", iast: "paṭhanam", meaning: "the act of reading / study", context: "Action Noun (Lyuṭ)", tag: "ल्युट् (Study)", category: "subanta", targetType: "nama", gender: "neut" },
+        { id: 'nom-3', sanskrit: "पठितः", iast: "paṭhitaḥ", meaning: "that which has been recited", context: "Past Participle (Kta)", tag: "क्त (Studied)", category: "subanta", targetType: "nama", gender: "masc" }
+      ]
+    },
+    "none-भू": {
+      actionWords: [
+        { id: 'act-1', sanskrit: "भवति", iast: "bhavati", meaning: "he becomes, exists, arises", context: "Present Indicative (Laṭ)", tag: "लट् (Present)", category: "tinanta", targetType: "kriya", tenseMood: "Present (Laṭ)", atmanepada: false },
+        { id: 'act-2', sanskrit: "भवतु", iast: "bhavatu", meaning: "may it be auspicious / let it become", context: "Imperative Mood (Loṭ)", tag: "लोट् (Imperative)", category: "tinanta", targetType: "kriya", tenseMood: "Imperative (Loṭ)", atmanepada: false },
+        { id: 'act-3', sanskrit: "भवेत्", iast: "bhavet", meaning: "it may exist / should be", context: "Potential Mood (Vidčiliṅ)", tag: "विधिलिङ् (Optative)", category: "tinanta", targetType: "kriya", tenseMood: "Optative (Vidčiliṅ)", atmanepada: false }
+      ],
+      nameWords: [
+        { id: 'nom-1', sanskrit: "भावः", iast: "bhāvaḥ", meaning: "existence, profound inner state, feeling", context: "Primary Nominal (Ghañ)", tag: "घञ् (Existence)", category: "subanta", targetType: "nama", gender: "masc" },
+        { id: 'nom-2', sanskrit: "भवनम्", iast: "bhavanam", meaning: "the act of becoming, abode", context: "Action Noun (Lyuṭ)", tag: "ल्युट् (Abode)", category: "subanta", targetType: "nama", gender: "neut" },
+        { id: 'nom-3', sanskrit: "भूतिः", iast: "bhūtiḥ", meaning: "prosperity, majestic manifestation", context: "Feminine Action Noun (Ktin)", tag: "क्तिन् (Prosperity)", category: "subanta", targetType: "nama", gender: "fem" }
+      ]
+    },
+    "none-स्था": {
+      actionWords: [
+        { id: 'act-1', sanskrit: "तिष्ठति", iast: "tiṣṭhati", meaning: "he stands, stays, endures", context: "Present Indicative (Laṭ)", tag: "लट् (Present)", category: "tinanta", targetType: "kriya", tenseMood: "Present (Laṭ)", atmanepada: false },
+        { id: 'act-2', sanskrit: "तिष्ठतु", iast: "tiṣṭhatu", meaning: "let him stand firm", context: "Imperative Mood (Loṭ)", tag: "लोट् (Imperative)", category: "tinanta", targetType: "kriya", tenseMood: "Imperative (Loṭ)", atmanepada: false },
+        { id: 'act-3', sanskrit: "तिष्ठेत्", iast: "tiṣṭhet", meaning: "he should abide steadfastly", context: "Potential Mood (Vidčiliṅ)", tag: "विधिलिङ् (Optative)", category: "tinanta", targetType: "kriya", tenseMood: "Optative (Vidčiliṅ)", atmanepada: false }
+      ],
+      nameWords: [
+        { id: 'nom-1', sanskrit: "स्थानम्", iast: "sthānam", meaning: "place, steady ground, abode", context: "Action Noun (Lyuṭ)", tag: "ल्युट् (Place)", category: "subanta", targetType: "nama", gender: "neut" },
+        { id: 'nom-2', sanskrit: "स्थितिः", iast: "sthitiḥ", meaning: "steadfast preservation, state", context: "Feminine Action Noun (Ktin)", tag: "क्तिन् (Preservation)", category: "subanta", targetType: "nama", gender: "fem" },
+        { id: 'nom-3', sanskrit: "स्थितः", iast: "sthitaḥ", meaning: "steadfastly abiding / situated", context: "Past Participle (Kta)", tag: "क्त (Steadfast)", category: "subanta", targetType: "nama", gender: "masc" }
+      ]
+    },
+    "none-कृ": {
+      actionWords: [
+        { id: 'act-1', sanskrit: "करोति", iast: "karoti", meaning: "he creates, does, performs", context: "Present Indicative (Laṭ Parasmaipada)", tag: "लट् (Parasmai)", category: "tinanta", targetType: "kriya", tenseMood: "Present (Laṭ)", atmanepada: false },
+        { id: 'act-2', sanskrit: "कुरुते", iast: "kurute", meaning: "he performs for oneself", context: "Present Indicative (Laṭ Ātmanepada)", tag: "लट् (Ātmane)", category: "tinanta", targetType: "kriya", tenseMood: "Present (Laṭ)", atmanepada: true },
+        { id: 'act-3', sanskrit: "करोतु", iast: "karotu", meaning: "let him accomplish / do", context: "Imperative Mood (Loṭ)", tag: "लोट् (Imperative)", category: "tinanta", targetType: "kriya", tenseMood: "Imperative (Loṭ)", atmanepada: false },
+        { id: 'act-4', sanskrit: "कुर्यात्", iast: "kuryāt", meaning: "he should perform duty", context: "Potential Mood (Vidčiliṅ)", tag: "विधिलिङ् (Optative)", category: "tinanta", targetType: "kriya", tenseMood: "Optative (Vidčiliṅ)", atmanepada: false }
+      ],
+      nameWords: [
+        { id: 'nom-1', sanskrit: "कार्यम्", iast: "kāryam", meaning: "noble deed, duty, sacred work", context: "Gerundive Noun (Ṇyat)", tag: "ण्यत् (Duty)", category: "subanta", targetType: "nama", gender: "neut" },
+        { id: 'nom-2', sanskrit: "करणम्", iast: "karaṇam", meaning: "instrument, active cause", context: "Action Noun (Lyuṭ)", tag: "ल्युट् (Cause)", category: "subanta", targetType: "nama", gender: "neut" },
+        { id: 'nom-3', sanskrit: "कृतिः", iast: "kṛtiḥ", meaning: "artistic creation, noble action", context: "Feminine Action Noun (Ktin)", tag: "क्तिन् (Creation)", category: "subanta", targetType: "nama", gender: "fem" },
+        { id: 'nom-4', sanskrit: "कृतम्", iast: "kṛtam", meaning: "accomplished deed, that which is done", context: "Past Participle (Kta)", tag: "क्त (Accomplished)", category: "subanta", targetType: "nama", gender: "neut" }
+      ]
+    },
+    // Prefixed Special Combinations
     "प्र-रम्": {
       actionWords: [
         { id: 'act-1', sanskrit: "प्ररमते", iast: "praramate", meaning: "he rejoices exceedingly", context: "Present Indicative (Laṭ, 3rd Person Ātmanepada)", tag: "लट् (Present)", category: "tinanta", targetType: "kriya", tenseMood: "Present (Laṭ)", atmanepada: true },
@@ -403,78 +527,46 @@ function getDerivedOptions(upasarga: Upasarga, dhatu: Dhatu): { actionWords: Suf
       actionWords: [
         { id: 'act-1', sanskrit: "आगच्छति", iast: "āgacchati", meaning: "he comes, arrives", context: "Present Indicative (Laṭ, 3rd Person)", tag: "लट् (Present)", category: "tinanta", targetType: "kriya", tenseMood: "Present (Laṭ)", atmanepada: false },
         { id: 'act-2', sanskrit: "आगच्छतु", iast: "āgacchatu", meaning: "let him arrive / welcome", context: "Imperative Mood (Loṭ)", tag: "लोट् (Imperative)", category: "tinanta", targetType: "kriya", tenseMood: "Imperative (Loṭ)", atmanepada: false },
-        { id: 'act-3', sanskrit: "आगच्छेत्", iast: "āgacchet", meaning: "may he arrive soon", context: "Potential Mood (Vidčiliṅ)", tag: "विधिलिङ् (Optative)", category: "tinanta", targetType: "kriya", tenseMood: "Optative (Vidčiliṅ)", atmanepada: false },
-        { id: 'act-4', sanskrit: "आगमिष्यति", iast: "āgamiṣyati", meaning: "he will arrive in future", context: "Simple Future (Lṛṭ Lakāra)", tag: "लृट् (Future)", category: "tinanta", targetType: "kriya", tenseMood: "Future (Lṛṭ)", atmanepada: false }
+        { id: 'act-3', sanskrit: "आगच्छेत्", iast: "āgacchet", meaning: "may he arrive soon", context: "Potential Mood (Vidčiliṅ)", tag: "विधिलिङ् (Optative)", category: "tinanta", targetType: "kriya", tenseMood: "Optative (Vidčiliṅ)", atmanepada: false }
       ],
       nameWords: [
         { id: 'nom-1', sanskrit: "आगमनम्", iast: "āgamanam", meaning: "arrival, advent, coming", context: "Action Noun (Lyuṭ Pratyaya)", tag: "ल्युट् (Arrival)", category: "subanta", targetType: "nama", gender: "neut" },
         { id: 'nom-2', sanskrit: "आगमः", iast: "āgamaḥ", meaning: "canonical scripture, sacred arrival", context: "Primary Nominal Derivative (Ghañ)", tag: "घञ् (Scripture)", category: "subanta", targetType: "nama", gender: "masc" },
-        { id: 'nom-3', sanskrit: "आगतः", iast: "āgataḥ", meaning: "the one who has arrived / guest", context: "Past Active Participle (Kta)", tag: "क्त (Arrived)", category: "subanta", targetType: "nama", gender: "masc" },
-        { id: 'nom-4', sanskrit: "आगतिः", iast: "āgatiḥ", meaning: "incoming return, arrival path", context: "Feminine Action Noun (Ktin)", tag: "क्तिन् (Feminine)", category: "subanta", targetType: "nama", gender: "fem" }
+        { id: 'nom-3', sanskrit: "आगतः", iast: "āgataḥ", meaning: "the one who has arrived / guest", context: "Past Active Participle (Kta)", tag: "क्त (Arrived)", category: "subanta", targetType: "nama", gender: "masc" }
       ]
     },
     "सम्-कृ": {
       actionWords: [
         { id: 'act-1', sanskrit: "संस्कुरुते", iast: "saṃskurute", meaning: "he refines, sanctifies (Ātmanepada)", context: "Present Indicative (Laṭ, Suṭ-āgama)", tag: "लट् (Ātmanepada)", category: "tinanta", targetType: "kriya", tenseMood: "Present (Laṭ)", atmanepada: true },
         { id: 'act-2', sanskrit: "संस्करोति", iast: "saṃskaroti", meaning: "he purifies, consecrates (Parasmaipada)", context: "Present Indicative (Laṭ)", tag: "लट् (Parasmaipada)", category: "tinanta", targetType: "kriya", tenseMood: "Present (Laṭ)", atmanepada: false },
-        { id: 'act-3', sanskrit: "संस्कुरुताम्", iast: "saṃskurutām", meaning: "let him sanctify / purify", context: "Imperative Mood (Loṭ)", tag: "लोट् (Imperative)", category: "tinanta", targetType: "kriya", tenseMood: "Imperative (Loṭ)", atmanepada: true },
-        { id: 'act-4', sanskrit: "संस्कुर्यात्", iast: "saṃskuryāt", meaning: "he should purify with sacred rite", context: "Potential Mood (Vidčiliṅ)", tag: "विधिलिङ् (Optative)", category: "tinanta", targetType: "kriya", tenseMood: "Optative (Vidčiliṅ)", atmanepada: false }
+        { id: 'act-3', sanskrit: "संस्कुरुताम्", iast: "saṃskurutām", meaning: "let him sanctify / purify", context: "Imperative Mood (Loṭ)", tag: "लोट् (Imperative)", category: "tinanta", targetType: "kriya", tenseMood: "Imperative (Loṭ)", atmanepada: true }
       ],
       nameWords: [
         { id: 'nom-1', sanskrit: "संस्कारः", iast: "saṃskāraḥ", meaning: "sacrament, spiritual impression, refinement", context: "Action Noun (Ghañ Pratyaya)", tag: "घञ् (Sacrament)", category: "subanta", targetType: "nama", gender: "masc" },
         { id: 'nom-2', sanskrit: "संस्कृतम्", iast: "saṃskṛtam", meaning: "refined, perfected, sacred Sanskrit", context: "Past Passive Participle (Kta)", tag: "क्त (Refined)", category: "subanta", targetType: "nama", gender: "neut" },
-        { id: 'nom-3', sanskrit: "संस्कृतिः", iast: "saṃskṛtiḥ", meaning: "culture, sacred civilization", context: "Feminine Action Noun (Ktin)", tag: "क्तिन् (Culture)", category: "subanta", targetType: "nama", gender: "fem" },
-        { id: 'nom-4', sanskrit: "संस्कर्ता", iast: "saṃskartā", meaning: "consecrator, master refiner", context: "Agent Noun (Tṛc Pratyaya)", tag: "तृच् (Agent)", category: "subanta", targetType: "nama", gender: "masc" }
+        { id: 'nom-3', sanskrit: "संस्कृतिः", iast: "saṃskṛtiḥ", meaning: "culture, sacred civilization", context: "Feminine Action Noun (Ktin)", tag: "क्तिन् (Culture)", category: "subanta", targetType: "nama", gender: "fem" }
       ]
     },
     "प्र-भू": {
       actionWords: [
         { id: 'act-1', sanskrit: "प्रभवति", iast: "prabhavati", meaning: "he originates, holds sovereign mastery", context: "Present Indicative (Laṭ)", tag: "लट् (Present)", category: "tinanta", targetType: "kriya", tenseMood: "Present (Laṭ)", atmanepada: false },
         { id: 'act-2', sanskrit: "प्रभवतु", iast: "prabhavatu", meaning: "let it manifest / originate", context: "Imperative Mood (Loṭ)", tag: "लोट् (Imperative)", category: "tinanta", targetType: "kriya", tenseMood: "Imperative (Loṭ)", atmanepada: false },
-        { id: 'act-3', sanskrit: "प्रभवेत्", iast: "prabhavet", meaning: "may it manifest and command", context: "Potential Mood (Vidčiliṅ)", tag: "विधिलिङ् (Optative)", category: "tinanta", targetType: "kriya", tenseMood: "Optative (Vidčiliṅ)", atmanepada: false },
-        { id: 'act-4', sanskrit: "प्राभवत्", iast: "prābhavat", meaning: "it originated / manifested", context: "Imperfect Past (Laṅ)", tag: "लङ् (Past)", category: "tinanta", targetType: "kriya", tenseMood: "Imperfect (Laṅ)", atmanepada: false }
+        { id: 'act-3', sanskrit: "प्रभवेत्", iast: "prabhavet", meaning: "may it manifest and command", context: "Potential Mood (Vidčiliṅ)", tag: "विधिलिङ् (Optative)", category: "tinanta", targetType: "kriya", tenseMood: "Optative (Vidčiliṅ)", atmanepada: false }
       ],
       nameWords: [
         { id: 'nom-1', sanskrit: "प्रभावः", iast: "prabhāvaḥ", meaning: "spiritual majesty, sovereign power, aura", context: "Action Noun (Ghañ)", tag: "घञ् (Power)", category: "subanta", targetType: "nama", gender: "masc" },
         { id: 'nom-2', sanskrit: "प्रभवः", iast: "prabhavaḥ", meaning: "fountainhead, place of first origin", context: "Noun of Source (Ap Pratyaya)", tag: "अप् (Source)", category: "subanta", targetType: "nama", gender: "masc" },
-        { id: 'nom-3', sanskrit: "प्रभवनम्", iast: "prabhavanam", meaning: "the process of manifestation", context: "Action Noun (Lyuṭ)", tag: "ल्युट् (Process)", category: "subanta", targetType: "nama", gender: "neut" },
-        { id: 'nom-4', sanskrit: "प्रभुः", iast: "prabhuḥ", meaning: "sovereign master, supreme lord", context: "Agent Noun (Ku Pratyaya)", tag: "कु (Master)", category: "subanta", targetType: "nama", gender: "masc" }
+        { id: 'nom-3', sanskrit: "प्रभवनम्", iast: "prabhavanam", meaning: "the process of manifestation", context: "Action Noun (Lyuṭ)", tag: "ल्युट् (Process)", category: "subanta", targetType: "nama", gender: "neut" }
       ]
     },
     "प्र-स्था": {
       actionWords: [
         { id: 'act-1', sanskrit: "प्रतिष्ठते", iast: "pratiṣṭhate", meaning: "he departs, sets forth, abides", context: "Present Indicative (Laṭ)", tag: "लट् (Present)", category: "tinanta", targetType: "kriya", tenseMood: "Present (Laṭ)", atmanepada: true },
-        { id: 'act-2', sanskrit: "प्रतिष्ठताम्", iast: "pratiṣṭhatām", meaning: "let him set forth / depart", context: "Imperative Mood (Loṭ)", tag: "लोट् (Imperative)", category: "tinanta", targetType: "kriya", tenseMood: "Imperative (Loṭ)", atmanepada: true },
-        { id: 'act-3', sanskrit: "प्रतिष्ठेत", iast: "pratiṣṭheta", meaning: "may he be established in truth", context: "Potential Mood (Vidčiliṅ)", tag: "विधिलिङ् (Optative)", category: "tinanta", targetType: "kriya", tenseMood: "Optative (Vidčiliṅ)", atmanepada: true }
+        { id: 'act-2', sanskrit: "प्रतिष्ठताम्", iast: "pratiṣṭhatām", meaning: "let him set forth / depart", context: "Imperative Mood (Loṭ)", tag: "लोट् (Imperative)", category: "tinanta", targetType: "kriya", tenseMood: "Imperative (Loṭ)", atmanepada: true }
       ],
       nameWords: [
-        { id: 'nom-1', sanskrit: "प्रस्थानम्", iast: "prasthānam", meaning: "departure, sacred treatise, foundation", context: "Action Noun (Lyuṭ)", tag: "ल्युट् (Treatise)", category: "subanta", targetType: "nama", gender: "neut" },
-        { id: 'nom-2', sanskrit: "प्रतिष्ठा", iast: "pratiṣṭhā", meaning: "prestige, firm foundation, consecration", context: "Feminine Noun (Aṅ)", tag: "अङ् (Prestige)", category: "subanta", targetType: "nama", gender: "fem" },
-        { id: 'nom-3', sanskrit: "प्रस्थितः", iast: "prasthitaḥ", meaning: "one who has set forth on journey", context: "Past Participle (Kta)", tag: "क्त (Departed)", category: "subanta", targetType: "nama", gender: "masc" }
-      ]
-    },
-    "none-रम्": {
-      actionWords: [
-        { id: 'act-1', sanskrit: "रमते", iast: "ramate", meaning: "he delights, rejoices", context: "Present Indicative (Laṭ)", tag: "लट् (Present)", category: "tinanta", targetType: "kriya", tenseMood: "Present (Laṭ)", atmanepada: true },
-        { id: 'act-2', sanskrit: "रमताम्", iast: "ramatām", meaning: "let him rejoice", context: "Imperative Mood (Loṭ)", tag: "लोट् (Imperative)", category: "tinanta", targetType: "kriya", tenseMood: "Imperative (Loṭ)", atmanepada: true },
-        { id: 'act-3', sanskrit: "रमेत", iast: "rameta", meaning: "may he take delight", context: "Potential Mood (Vidčiliṅ)", tag: "विधिलिङ् (Optative)", category: "tinanta", targetType: "kriya", tenseMood: "Optative (Vidčiliṅ)", atmanepada: true }
-      ],
-      nameWords: [
-        { id: 'nom-1', sanskrit: "रामः", iast: "rāmaḥ", meaning: "noble delight, the charming one", context: "Action Noun (Ghañ)", tag: "घञ् (Epithet)", category: "subanta", targetType: "nama", gender: "masc" },
-        { id: 'nom-2', sanskrit: "रमणम्", iast: "ramaṇam", meaning: "sporting, act of delighting", context: "Action Noun (Lyuṭ)", tag: "ल्युट् (Delighting)", category: "subanta", targetType: "nama", gender: "neut" },
-        { id: 'nom-3', sanskrit: "रतिः", iast: "ratiḥ", meaning: "pleasure, deep affection", context: "Feminine Noun (Ktin)", tag: "क्तिन् (Pleasure)", category: "subanta", targetType: "nama", gender: "fem" }
-      ]
-    },
-    "none-गम्": {
-      actionWords: [
-        { id: 'act-1', sanskrit: "गच्छति", iast: "gacchati", meaning: "he goes, moves", context: "Present Indicative (Laṭ)", tag: "लट् (Present)", category: "tinanta", targetType: "kriya", tenseMood: "Present (Laṭ)", atmanepada: false },
-        { id: 'act-2', sanskrit: "गच्छतु", iast: "gacchatu", meaning: "let him go", context: "Imperative Mood (Loṭ)", tag: "लोट् (Imperative)", category: "tinanta", targetType: "kriya", tenseMood: "Imperative (Loṭ)", atmanepada: false },
-        { id: 'act-3', sanskrit: "गच्छेत्", iast: "gacchet", meaning: "he should go", context: "Potential Mood (Vidčiliṅ)", tag: "विधिलिङ् (Optative)", category: "tinanta", targetType: "kriya", tenseMood: "Optative (Vidčiliṅ)", atmanepada: false }
-      ],
-      nameWords: [
-        { id: 'nom-1', sanskrit: "गमनम्", iast: "gamanam", meaning: "going, departure, transit", context: "Action Noun (Lyuṭ)", tag: "ल्युट् (Transit)", category: "subanta", targetType: "nama", gender: "neut" },
-        { id: 'nom-2', sanskrit: "गतिः", iast: "gatiḥ", meaning: "path, movement, spiritual refuge", context: "Feminine Action Noun (Ktin)", tag: "क्तिन् (Path)", category: "subanta", targetType: "nama", gender: "fem" },
-        { id: 'nom-3', sanskrit: "गतः", iast: "gataḥ", meaning: "the one who has gone", context: "Past Participle (Kta)", tag: "क्त (Gone)", category: "subanta", targetType: "nama", gender: "masc" }
+        { id: 'nom-1', sanskrit: "प्रस्थानम्", iast: "prasthānam", meaning: "departure, journey, philosophical school", context: "Action Noun (Lyuṭ)", tag: "ल्युट् (Departure)", category: "subanta", targetType: "nama", gender: "neut" },
+        { id: 'nom-2', sanskrit: "प्रतिष्ठा", iast: "pratiṣṭhā", meaning: "reputation, sacred establishment", context: "Feminine Abstract Noun", tag: "टाप् (Establishment)", category: "subanta", targetType: "nama", gender: "fem" }
       ]
     }
   };
@@ -583,16 +675,17 @@ export default function SanskritMorphEngine() {
   // Navigation View: 'equation' (Step 1) | 'matrix' (Step 2) | 'etymology' (Step 3)
   const [currentStep, setCurrentStep] = useState<'equation' | 'matrix' | 'etymology'>('equation');
 
-  // Root Selection State
-  const [dhatuIndex, setDhatuIndex] = useState<number>(0);
+  // Root Selection State: default is -1 (unselected / none)
+  const [dhatuIndex, setDhatuIndex] = useState<number>(-1);
   const [dhatuMode, setDhatuMode] = useState<'dial' | 'type'>('dial');
+  const [isRootQuickSelectOpen, setIsRootQuickSelectOpen] = useState<boolean>(false);
   const [customDhatuSanskrit, setCustomDhatuSanskrit] = useState<string>("रम्");
   const [customDhatuIast, setCustomDhatuIast] = useState<string>("ram");
   const [customDhatuMeaning, setCustomDhatuMeaning] = useState<string>("to delight, revel");
   const [customIsNominal, setCustomIsNominal] = useState<boolean>(false);
 
-  // Upasarga Selection Index (0 to 21 across STANDARD_22_UPASARGAS)
-  const [savedUpasargaIndex, setSavedUpasargaIndex] = useState<number>(0);
+  // Upasarga Selection Index: default is -1 (None by default)
+  const [savedUpasargaIndex, setSavedUpasargaIndex] = useState<number>(-1);
   const [isPrefixQuickSelectOpen, setIsPrefixQuickSelectOpen] = useState<boolean>(false);
 
   // HIGH-LEVEL TOGGLE IN SUFFIX DIAL: 'kriya' (Action Word) vs 'nama' (Name Word)
@@ -621,6 +714,9 @@ export default function SanskritMorphEngine() {
   // Active Dhātu
   const currentDhatu: Dhatu = useMemo(() => {
     if (dhatuMode === 'dial') {
+      if (dhatuIndex < 0 || dhatuIndex >= DHATUS.length) {
+        return NONE_DHATU;
+      }
       return DHATUS[dhatuIndex];
     }
     return { 
@@ -636,13 +732,21 @@ export default function SanskritMorphEngine() {
     };
   }, [dhatuMode, dhatuIndex, customDhatuSanskrit, customDhatuIast, customDhatuMeaning, customIsNominal]);
 
-  // Dynamic Kriyāyoga Check: If root cannot have prefix, set prefix to None
+  // PREFIX DIAL TOGGLE STATUS:
+  // Inactive for toggle and set to none by default.
+  // ONLY active for toggle if the root dial has selected a root word which allows prefix!
+  const isPrefixActive = useMemo(() => {
+    return currentDhatu.canHavePrefix;
+  }, [currentDhatu]);
+
+  // Dynamic Upasarga computation:
+  // If prefix dial is inactive OR savedUpasargaIndex < 0, locked to NONE_UPASARGA ("—").
   const currentUpasarga: Upasarga = useMemo(() => {
-    if (!currentDhatu.canHavePrefix) {
+    if (!isPrefixActive || savedUpasargaIndex < 0) {
       return NONE_UPASARGA;
     }
     return STANDARD_22_UPASARGAS[savedUpasargaIndex % STANDARD_22_UPASARGAS.length];
-  }, [currentDhatu.canHavePrefix, savedUpasargaIndex]);
+  }, [isPrefixActive, savedUpasargaIndex]);
 
   // Suffix Derivation based on the High-Level Toggle & Multiple Options
   const derivedOptions = useMemo(() => {
@@ -677,9 +781,17 @@ export default function SanskritMorphEngine() {
     }
   };
 
-  // DYNAMIC PARADIGM MATRIX COMPUTATION:
-  // Directly computed and displayed based on the SPECIFIC SELECTED OPTION!
+  // DYNAMIC PARADIGM MATRIX COMPUTATION
   const dynamicMatrixData = useMemo(() => {
+    if (dhatuIndex === -1 || currentResult.sanskrit === '—') {
+      return {
+        type: suffixTargetType,
+        title: 'Awaiting Root Selection',
+        subtitle: 'Select a root word in Step 1 to populate this paradigm table.',
+        rows: []
+      };
+    }
+
     if (suffixTargetType === 'nama') {
       // 7 CASES × 3 NUMBERS (7 × 3 Nominal Grid)
       const nominalWord = currentResult.sanskrit;
@@ -748,17 +860,14 @@ export default function SanskritMorphEngine() {
       let r3: [string, string, string];
 
       if (currentResult.tag.includes('लोट्')) {
-        // Imperative
         r1 = isAtmanepada ? [`${base}ताम्`, `${base}ेताम्`, `${base}न्ताम्`] : [`${base}तु`, `${base}ताम्`, `${base}न्तु`];
         r2 = isAtmanepada ? [`${base}स्व`, `${base}ेथाम्`, `${base}ध्वम्`] : [`${base}`, `${base}तम्`, `${base}त`];
         r3 = isAtmanepada ? [`${base}ै`, `${base}ावहै`, `${base}ामहै`] : [`${base}ानि`, `${base}ाव`, `${base}ाम`];
       } else if (currentResult.tag.includes('विधिलिङ्')) {
-        // Optative
         r1 = isAtmanepada ? [`${base}ेत`, `${base}ेयाताम्`, `${base}ेरन्`] : [`${base}ेत्`, `${base}ेताम्`, `${base}ेयुः`];
         r2 = isAtmanepada ? [`${base}ेथाः`, `${base}ेयाथाम्`, `${base}ेध्वम्`] : [`${base}ेः`, `${base}ेतम्`, `${base}ेत`];
         r3 = isAtmanepada ? [`${base}ेय`, `${base}ेवहि`, `${base}ेमहि`] : [`${base}ेयम्`, `${base}ेव`, `${base}ेम`];
       } else {
-        // Standard Present (Laṭ)
         r1 = isAtmanepada ? [`${base}ते`, `${base}ेते`, `${base}न्ते`] : [`${base}ति`, `${base}तः`, `${base}न्ति`];
         r2 = isAtmanepada ? [`${base}से`, `${base}ेथे`, `${base}ध्वे`] : [`${base}सि`, `${base}थः`, `${base}थ`];
         r3 = isAtmanepada ? [`${base}े`, `${base}ावहे`, `${base}ामहे`] : [`${base}मि`, `${base}ावः`, `${base}ामः`];
@@ -775,13 +884,55 @@ export default function SanskritMorphEngine() {
         ]
       };
     }
-  }, [suffixTargetType, currentResult]);
+  }, [dhatuIndex, suffixTargetType, currentResult]);
 
-  const activeMatrixRow = dynamicMatrixData.rows[selectedRowIndex % dynamicMatrixData.rows.length];
+  const activeMatrixRow = dynamicMatrixData.rows && dynamicMatrixData.rows.length > 0
+    ? dynamicMatrixData.rows[selectedRowIndex % dynamicMatrixData.rows.length]
+    : { name: "Awaiting", sanskritName: "प्रतीक्षा", meaning: "Awaiting selection", forms: ["—", "—", "—"] };
   const activeMatrixCellForm = activeMatrixRow.forms[selectedColIndex % 3];
 
   // Dynamic Etymology Data
   const currentEtymology: EtymologyData = useMemo(() => {
+    if (dhatuIndex === -1 || currentDhatu.sanskrit === "—") {
+      return {
+        sutra: "धात्वादेः षः सः / उपसर्गाः क्रियायोगे",
+        sutraNumber: "अष्टाध्यायी १.४.५९ / ३.१.९१",
+        sutraType: "Pāṇinian Structural Foundation",
+        sutraExplanation: "Select a root word in Step 1 to explore its morphological derivation and associated Pāṇinian sūtras. Prefix dial is inactive and set to None by default.",
+        derivationSteps: [
+          {
+            step: 1,
+            title: "Root Sound Foundation",
+            sutraRule: "भूवादयो धातवः (१.३.१)",
+            description: "In Sanskrit grammar, every word originates from either an action verbal root (Dhātu) or a nominal stem (Prātipadika).",
+            intermediate: "—"
+          },
+          {
+            step: 2,
+            title: "Prepositional Prefixation Rule",
+            sutraRule: "उपसर्गाः क्रियायोगे (१.४.५९)",
+            description: "Upasargas (verbal prefixes) only attach when compounded with an action root (क्रियायोगे). Prefix dial remains inactive and set to None until an action root is selected.",
+            intermediate: "उपसर्गाः क्रियायोगे"
+          },
+          {
+            step: 3,
+            title: "Paradigm Matrix Synthesis",
+            sutraRule: "सुप्तिङन्तं पदम् (१.४.१४)",
+            description: "Action words yield 3 × 3 verbal conjugation tables (Tiṅanta), while name words yield 7 × 3 nominal declension tables (Subanta).",
+            intermediate: "पदसंज्ञा"
+          }
+        ],
+        poeticNuance: "Language begins at the radical root; select a root word above to witness its morphing journey.",
+        literaryContext: "Foundational Pāṇinian grammar system (Vyākaraṇa).",
+        exampleSentence: {
+          sanskrit: "उपसर्गेण धात्वर्थो बलादन्यत्र नीयते।",
+          iast: "upasargeṇa dhātv-artho balād anyatra nīyate.",
+          translation: "By an Upasarga, the meaning of a root is forcefully directed into a distinct nuance.",
+          source: "Sanskrit Grammatical Adage"
+        }
+      };
+    }
+
     const isNama = suffixTargetType === 'nama';
     const sutraTitle = isNama
       ? `कृत्तद्धितसमासाश्च (१.२.४६) — [${currentResult.tag}]`
@@ -797,7 +948,7 @@ export default function SanskritMorphEngine() {
       derivationSteps: [
         {
           step: 1,
-          title: isNama ? `Affixation of ${currentResult.tag}` : `Affixation of ${currentResult.tag}`,
+          title: `Affixation of ${currentResult.tag}`,
           sutraRule: isNama ? "कृदतिङ् (३.१.९३)" : "कर्तरि शप् (३.१.६८)",
           description: isNama 
             ? `Root takes nominal suffix '${currentResult.tag}' to denote the noun/state: ${currentResult.meaning}.`
@@ -838,7 +989,7 @@ export default function SanskritMorphEngine() {
         source: "Classical Sanskrit Formulation"
       }
     };
-  }, [suffixTargetType, currentDhatu, currentUpasarga, currentResult, dynamicMatrixData]);
+  }, [dhatuIndex, currentDhatu, suffixTargetType, currentResult, currentUpasarga, dynamicMatrixData]);
 
   // Audio Speech Synthesis
   const speakSanskrit = useCallback((text: string) => {
@@ -858,36 +1009,74 @@ export default function SanskritMorphEngine() {
     }
   }, []);
 
-  // Upasarga Cycling across ALL 22 STANDARD UPASARGAS
-  const cycleUpasarga = () => {
-    if (!currentDhatu.canHavePrefix) {
-      showToast(`Selected root '${currentDhatu.sanskrit}' is a nominal stem (प्रातिपदिक) and cannot take verbal Upasargas.`);
-      return;
-    }
-    setSavedUpasargaIndex((prev) => (prev + 1) % STANDARD_22_UPASARGAS.length);
-  };
-
-  // Root cycling
-  const cycleDhatu = () => {
-    if (dhatuMode === 'dial') {
-      const nextIdx = (dhatuIndex + 1) % DHATUS.length;
-      setDhatuIndex(nextIdx);
-
-      const nextDhatu = DHATUS[nextIdx];
-      if (!nextDhatu.canHavePrefix) {
-        setSuffixTargetType('nama');
-        showToast(`'${nextDhatu.sanskrit}' is a Nominal Stem (प्रातिपदिक). Switched to Name Word 7 × 3.`);
-      }
-    }
-  };
-
   const showToast = (msg: string) => {
     setFeedbackToast(msg);
     setTimeout(() => setFeedbackToast(null), 3500);
   };
 
+  // Upasarga Cycling:
+  // Inactive for toggle and set to none by default.
+  // ONLY active for toggle if the root dial has selected a root word which allows prefix!
+  const cycleUpasarga = () => {
+    if (!isPrefixActive) {
+      if (dhatuIndex === -1) {
+        showToast("Prefix dial is inactive and set to None by default. Select a root word in the Root Dial first.");
+      } else {
+        showToast(`Prefix dial is inactive. Nominal stem '${currentDhatu.sanskrit}' cannot take verbal Upasargas (उपसर्गाः क्रियायोगे १.४.५९).`);
+      }
+      return;
+    }
+
+    // When active, cycle: None (-1) -> 0 (प्र) -> 1 (परा) -> ... -> 21 (उप) -> None (-1)
+    setSavedUpasargaIndex((prev) => {
+      if (prev === -1) return 0; // Turn on first Upasarga 'प्र'
+      if (prev >= STANDARD_22_UPASARGAS.length - 1) return -1; // Return to None
+      return prev + 1;
+    });
+  };
+
+  // Select Root Word by Index
+  const selectDhatuByIndex = (idx: number) => {
+    setDhatuIndex(idx);
+    setIsRootQuickSelectOpen(false);
+
+    if (idx < 0) {
+      // Reset to unselected default: prefix dial returns to inactive and none
+      setSavedUpasargaIndex(-1);
+      showToast("Reset to default. Prefix dial is inactive and set to None.");
+      return;
+    }
+
+    const chosen = DHATUS[idx];
+    if (chosen.canHavePrefix) {
+      // Verbal Dhātu: prefix dial BECOMES ACTIVE for toggle!
+      // Set to None (-1) by default so user can toggle it when desired.
+      setSavedUpasargaIndex(-1);
+      showToast(`Root '${chosen.sanskrit}' (${chosen.iast}) selected. Prefix dial is now ACTIVE for toggle!`);
+    } else {
+      // Nominal Stem: prefix dial stays INACTIVE and set to None!
+      setSavedUpasargaIndex(-1);
+      setSuffixTargetType('nama');
+      showToast(`Nominal stem '${chosen.sanskrit}' selected. Prefix dial is INACTIVE (locked to None per Pāṇini 1.4.59).`);
+    }
+  };
+
+  // Root cycling through Dial
+  const cycleDhatu = () => {
+    if (dhatuMode === 'dial') {
+      // Cycle: -1 (None) -> 0 -> 1 -> ... -> 12 -> -1
+      const nextIdx = dhatuIndex >= DHATUS.length - 1 ? -1 : dhatuIndex + 1;
+      selectDhatuByIndex(nextIdx);
+    }
+  };
+
   // Bookmark / Save to Notebook
   const saveActiveExpression = (type: 'equation' | 'matrix' | 'etymology') => {
+    if (dhatuIndex === -1) {
+      showToast("Please select a root word first before saving to Notebook.");
+      return;
+    }
+
     let newEntry: SavedExpression;
 
     if (type === 'equation') {
@@ -1048,26 +1237,25 @@ export default function SanskritMorphEngine() {
 
             <button
               onClick={() => {
-                const targetText = currentStep === 'equation' 
-                  ? currentResult.sanskrit 
+                const textToSpeak = currentStep === 'equation' 
+                  ? (dhatuIndex === -1 ? "संस्कृत पद निष्पत्ति" : currentResult.sanskrit)
                   : currentStep === 'matrix' 
                     ? activeMatrixCellForm 
                     : currentEtymology.sutra.split(' ')[0];
-                speakSanskrit(targetText);
+                speakSanskrit(textToSpeak);
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-indigo-300 bg-indigo-950/60 hover:bg-indigo-900/60 border border-indigo-800/40 rounded-xl transition-all shadow-sm"
+              className="p-2 rounded-xl text-slate-400 hover:text-white bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] transition-all"
               title="Speak active Sanskrit form"
             >
-              {isSpeaking ? <VolumeX className="w-3.5 h-3.5 animate-bounce text-indigo-200" /> : <Volume2 className="w-3.5 h-3.5" />}
-              <span className="hidden sm:inline">{isSpeaking ? "Speaking..." : "Pronounce"}</span>
+              {isSpeaking ? <VolumeX className="w-4 h-4 text-indigo-400 animate-pulse" /> : <Volume2 className="w-4 h-4" />}
             </button>
           </div>
 
         </div>
       </header>
 
-      {/* MAIN VIEWPORT CANVAS */}
-      <main className="flex-1 max-w-6xl w-full mx-auto px-6 py-8 flex flex-col items-center z-10">
+      {/* MAIN VIEW CONTENT CONTAINER */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-6 flex flex-col justify-center">
         
         <AnimatePresence mode="wait">
           
@@ -1079,19 +1267,19 @@ export default function SanskritMorphEngine() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -15 }}
               transition={{ duration: 0.25 }}
-              className="w-full flex flex-col items-center"
+              className="flex flex-col items-center"
             >
-              {/* Studio Canvas Heading */}
+              {/* Studio Header */}
               <div className="text-center mb-6">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-[11px] font-mono uppercase tracking-widest mb-3">
-                  <Sparkles className="w-3 h-3 text-indigo-400" />
-                  <span>Explore Multiple Action & Name Word Options Below</span>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-mono mb-2">
+                  <Workflow className="w-3.5 h-3.5" />
+                  <span>Interactive Equation Studio · Pāṇinian Rule Engine</span>
                 </div>
                 <h2 className="text-2xl md:text-3xl font-light tracking-tight text-white font-serif">
                   Morphological Equation Studio
                 </h2>
                 <p className="text-xs text-slate-400 max-w-xl mx-auto mt-1">
-                  Toggle between <span className="text-indigo-300 font-medium">Action Word</span> and <span className="text-purple-300 font-medium">Name Word</span>, then choose from multiple derived forms to visually verify the paradigm matrix.
+                  Prefix dial is <span className="text-slate-300 font-medium">inactive for toggle and set to None by default</span>. Select a root word in the Root Dial to activate prefix toggling.
                 </p>
               </div>
 
@@ -1102,70 +1290,138 @@ export default function SanskritMorphEngine() {
                 <div 
                   onClick={cycleUpasarga}
                   className={`group relative flex-1 w-full max-w-sm p-6 rounded-2xl border transition-all flex flex-col items-center text-center backdrop-blur-md shadow-2xl ${
-                    currentDhatu.canHavePrefix 
-                      ? 'bg-gradient-to-b from-white/[0.04] to-transparent border-white/[0.07] hover:border-indigo-500/50 cursor-pointer' 
-                      : 'bg-white/[0.015] border-white/[0.04] cursor-not-allowed opacity-80'
+                    isPrefixActive 
+                      ? 'bg-gradient-to-b from-white/[0.04] to-transparent border-white/[0.08] hover:border-indigo-500/50 cursor-pointer' 
+                      : 'bg-white/[0.015] border-white/[0.04] cursor-not-allowed opacity-75'
                   }`}
                 >
-                  {/* Top Header Pill */}
-                  <div className="absolute top-3 right-3 flex items-center gap-1.5">
-                    {currentDhatu.canHavePrefix ? (
-                      <>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setIsPrefixQuickSelectOpen(true);
-                          }}
-                          className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-indigo-300 border border-white/10 transition-colors flex items-center gap-1"
-                          title="Open all 22 Upasargas grid"
-                        >
-                          <span>All 22</span>
-                          <ChevronDown className="w-2.5 h-2.5" />
-                        </button>
-                        <span className="text-[10px] font-mono text-slate-500 group-hover:text-indigo-400 transition-colors">
-                          {savedUpasargaIndex + 1}/22 ⟳
-                        </span>
-                      </>
+                  {/* Top Header Row with Status and Controls */}
+                  <div className="w-full flex items-center justify-between mb-2">
+                    {/* Status Pill */}
+                    {isPrefixActive ? (
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 flex items-center gap-1 shadow-sm">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span>Active for Toggle</span>
+                      </span>
                     ) : (
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-rose-500/10 text-rose-300 border border-rose-500/20">
-                        Locked: None
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-slate-500/15 text-slate-400 border border-slate-500/25 flex items-center gap-1">
+                        <Lock className="w-2.5 h-2.5 text-slate-500" />
+                        <span>Inactive · Set to None</span>
                       </span>
                     )}
+
+                    {/* Controls Pill */}
+                    <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                      {isPrefixActive ? (
+                        <>
+                          {/* Quick None / Upasarga toggle pill */}
+                          <div className="flex items-center bg-black/40 p-0.5 rounded-lg border border-white/10">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSavedUpasargaIndex(-1);
+                                showToast("Prefix set to None (विना उपसर्गम्).");
+                              }}
+                              className={`px-2 py-0.5 text-[10px] rounded font-mono transition-all ${
+                                savedUpasargaIndex === -1
+                                  ? 'bg-indigo-600 text-white font-semibold shadow-sm'
+                                  : 'text-slate-400 hover:text-white'
+                              }`}
+                              title="No Prefix (None)"
+                            >
+                              None
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSavedUpasargaIndex((prev) => (prev < 0 ? 0 : prev));
+                                showToast("Upasarga activated.");
+                              }}
+                              className={`px-2 py-0.5 text-[10px] rounded font-mono transition-all ${
+                                savedUpasargaIndex >= 0
+                                  ? 'bg-indigo-600 text-white font-semibold shadow-sm'
+                                  : 'text-slate-400 hover:text-white'
+                              }`}
+                              title="Activate Upasarga"
+                            >
+                              Prefix
+                            </button>
+                          </div>
+
+                          <button
+                            onClick={() => setIsPrefixQuickSelectOpen(true)}
+                            className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-indigo-300 border border-white/10 transition-colors flex items-center gap-1"
+                            title="Open all 22 Upasargas grid"
+                          >
+                            <span>All 22</span>
+                            <ChevronDown className="w-2.5 h-2.5" />
+                          </button>
+                        </>
+                      ) : (
+                        <span className="text-[10px] font-mono text-slate-500">
+                          Disabled
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="text-[11px] uppercase tracking-wider text-slate-400 font-mono mb-1">
-                    {currentDhatu.canHavePrefix ? "Prefix (उपसर्ग)" : "Prefix: Inactive"}
+                    {isPrefixActive ? "Prefix (उपसर्ग)" : "Prefix: Inactive"}
                   </div>
 
-                  {/* Prefix Main Display */}
-                  {currentDhatu.canHavePrefix ? (
-                    <>
-                      <div className="text-4xl md:text-5xl font-bold tracking-tight text-white my-3 group-hover:scale-105 transition-transform font-serif">
-                        {currentUpasarga.sanskrit}
+                  {/* Main Display Body */}
+                  {isPrefixActive ? (
+                    savedUpasargaIndex >= 0 ? (
+                      <>
+                        <div className="text-4xl md:text-5xl font-bold tracking-tight text-white my-3 group-hover:scale-105 transition-transform font-serif">
+                          {currentUpasarga.sanskrit}
+                        </div>
+                        <div className="text-sm font-mono text-indigo-300 mb-1">{currentUpasarga.iast}</div>
+                        <div className="text-xs text-slate-300 italic min-h-[32px] flex items-center justify-center">
+                          &ldquo;{currentUpasarga.meaning}&rdquo;
+                        </div>
+                        <div className="mt-3 pt-3 border-t border-white/[0.06] w-full text-[11px] text-slate-400 leading-snug">
+                          {currentUpasarga.nuance}
+                        </div>
+                        <div className="mt-2 text-[10px] text-indigo-400/80 font-mono">
+                          Click dial to cycle · ({savedUpasargaIndex + 1}/22 ⟳)
+                        </div>
+                      </>
+                    ) : (
+                      <div className="my-auto py-2 flex flex-col items-center">
+                        <div className="text-4xl md:text-5xl font-bold tracking-tight text-slate-400 my-2 font-serif group-hover:text-slate-200 transition-colors">
+                          —
+                        </div>
+                        <div className="text-xs font-mono text-indigo-300/80 mb-1">None (उपसर्गरहित)</div>
+                        <div className="text-xs text-slate-400 italic mb-2">Base root without prefix (केवल-धातु)</div>
+                        <div className="text-[11px] text-slate-400 leading-snug p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.05] w-full">
+                          Prefix dial is <span className="text-emerald-300 font-semibold">Active</span>. Click anywhere or toggle &lsquo;Prefix&rsquo; above to apply an Upasarga.
+                        </div>
+                        <div className="mt-2 text-[10px] text-indigo-400/80 font-mono">
+                          Click dial to cycle prefixes
+                        </div>
                       </div>
-                      <div className="text-sm font-mono text-indigo-300 mb-1">{currentUpasarga.iast}</div>
-                      <div className="text-xs text-slate-300 italic min-h-[32px] flex items-center">
-                        &ldquo;{currentUpasarga.meaning}&rdquo;
-                      </div>
-                      <div className="mt-3 pt-3 border-t border-white/[0.06] w-full text-[11px] text-slate-400 leading-snug">
-                        {currentUpasarga.nuance}
-                      </div>
-                    </>
+                    )
                   ) : (
-                    <div className="my-auto py-4 flex flex-col items-center">
-                      <div className="text-3xl font-bold tracking-tight text-slate-500 my-2 font-mono">
-                        — (None)
+                    <div className="my-auto py-2 flex flex-col items-center">
+                      <div className="text-4xl md:text-5xl font-bold tracking-tight text-slate-600 my-2 font-serif">
+                        —
                       </div>
-                      <div className="text-xs font-mono text-slate-400 mb-2">उपसर्गरहित (No Upasarga)</div>
-                      <div className="text-[11px] text-slate-500 leading-snug p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.05]">
-                        <span className="text-indigo-300 font-semibold">उपसर्गाः क्रियायोगे (१.४.५९):</span> Nominal stems do not take Upasargas.
+                      <div className="text-xs font-mono text-slate-500 mb-1">None (उपसर्गरहित)</div>
+                      <div className="text-[11px] text-slate-400 leading-snug p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.05] w-full mt-2">
+                        {dhatuIndex === -1 ? (
+                          <>
+                            <span className="text-indigo-300 font-semibold">Inactive by default:</span> Select a root word in the Root Dial to activate prefix toggling.
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-indigo-300 font-semibold">उपसर्गाः क्रियायोगे (१.४.५९):</span> Nominal stems do not take Upasargas. Stays inactive and locked to None.
+                          </>
+                        )}
                       </div>
-                    </div>
-                  )}
-
-                  {currentDhatu.canHavePrefix && (
-                    <div className="mt-2 text-[10px] text-indigo-400/70 font-mono">
-                      Click to cycle all 22 Upasargas
+                      <div className="mt-2 text-[10px] text-slate-500 font-mono">
+                        Prefix toggle inactive
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1175,40 +1431,83 @@ export default function SanskritMorphEngine() {
                 {/* 2. DHĀTU (ROOT SOUND) DIAL */}
                 <div className="group relative flex-1 w-full max-w-sm p-6 rounded-2xl bg-gradient-to-b from-white/[0.04] to-transparent border border-white/[0.07] hover:border-indigo-500/50 transition-all flex flex-col items-center text-center backdrop-blur-md shadow-2xl">
                   
-                  {/* Mode switcher toggle */}
-                  <div className="absolute top-3 right-3 flex items-center gap-1.5">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setDhatuMode(dhatuMode === 'dial' ? 'type' : 'dial');
-                      }}
-                      className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-indigo-300 border border-white/10 transition-colors flex items-center gap-1"
-                      title="Switch between Dial and Custom Type mode"
-                    >
-                      {dhatuMode === 'dial' ? <Keyboard className="w-3 h-3" /> : <Compass className="w-3 h-3" />}
-                      <span>{dhatuMode === 'dial' ? 'Type' : 'Dial'}</span>
-                    </button>
-                    {dhatuMode === 'dial' && (
-                      <span className="text-[10px] font-mono text-slate-500">
-                        {dhatuIndex + 1}/{DHATUS.length}
-                      </span>
-                    )}
+                  {/* Top Controls */}
+                  <div className="w-full flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsRootQuickSelectOpen(true);
+                        }}
+                        className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 border border-indigo-500/30 transition-colors flex items-center gap-1"
+                        title="Open all roots selector"
+                      >
+                        <Compass className="w-2.5 h-2.5" />
+                        <span>Roots (१३)</span>
+                        <ChevronDown className="w-2.5 h-2.5" />
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setDhatuMode(dhatuMode === 'dial' ? 'type' : 'dial');
+                        }}
+                        className="text-[10px] font-mono px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-indigo-300 border border-white/10 transition-colors flex items-center gap-1"
+                        title="Switch between Dial and Custom Type mode"
+                      >
+                        {dhatuMode === 'dial' ? <Keyboard className="w-3 h-3" /> : <Compass className="w-3 h-3" />}
+                        <span>{dhatuMode === 'dial' ? 'Type' : 'Dial'}</span>
+                      </button>
+                      {dhatuMode === 'dial' && (
+                        <span className="text-[10px] font-mono text-slate-500">
+                          {dhatuIndex === -1 ? '0/13' : `${dhatuIndex + 1}/${DHATUS.length}`}
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   <div className="text-[11px] uppercase tracking-wider text-slate-400 font-mono mb-1">
-                    {currentDhatu.type === 'nama' ? 'Nominal Stem (प्रातिपदिक)' : 'Root (धातु)'}
+                    {dhatuIndex === -1 ? 'Root Sound (धातु)' : (currentDhatu.type === 'nama' ? 'Nominal Stem (प्रातिपदिक)' : 'Verbal Root (धातु)')}
                   </div>
 
                   {dhatuMode === 'dial' ? (
-                    <div onClick={cycleDhatu} className="w-full cursor-pointer py-1">
-                      <div className="text-4xl md:text-5xl font-bold tracking-tight text-white my-3 group-hover:scale-105 transition-transform font-serif">
-                        {currentDhatu.sanskrit}
+                    dhatuIndex === -1 ? (
+                      <div onClick={cycleDhatu} className="w-full cursor-pointer my-auto py-2 flex flex-col items-center">
+                        <div className="text-4xl md:text-5xl font-bold tracking-tight text-slate-400 my-2 font-serif group-hover:scale-105 transition-transform">
+                          —
+                        </div>
+                        <div className="text-xs font-mono text-indigo-300 mb-1">Click to Select Root</div>
+                        <div className="text-xs text-slate-400 italic mb-2">Choose from 10 Dhātus or 3 Nominal Stems</div>
+                        <div className="text-[11px] text-slate-400 leading-snug p-2.5 rounded-lg bg-white/[0.02] border border-white/[0.05] w-full">
+                          Selecting a verbal Dhātu will <span className="text-emerald-300 font-semibold">activate</span> the prefix dial.
+                        </div>
+                        <div className="mt-2 text-[10px] text-indigo-400/80 font-mono">
+                          Click dial to begin cycling
+                        </div>
                       </div>
-                      <div className="text-sm font-mono text-indigo-300 mb-1">{currentDhatu.iast}</div>
-                      <div className="text-xs text-slate-300 italic min-h-[32px] flex items-center justify-center">
-                        &ldquo;{currentDhatu.meaning}&rdquo;
+                    ) : (
+                      <div onClick={cycleDhatu} className="w-full cursor-pointer py-1">
+                        <div className="text-4xl md:text-5xl font-bold tracking-tight text-white my-3 group-hover:scale-105 transition-transform font-serif">
+                          {currentDhatu.sanskrit}
+                        </div>
+                        <div className="text-sm font-mono text-indigo-300 mb-1">{currentDhatu.iast}</div>
+                        <div className="text-xs text-slate-300 italic min-h-[32px] flex items-center justify-center">
+                          &ldquo;{currentDhatu.meaning}&rdquo;
+                        </div>
+                        <div className="mt-3 pt-3 border-t border-white/[0.06] w-full text-[11px] text-slate-400">
+                          {currentDhatu.canHavePrefix ? (
+                            <span className="text-emerald-300 font-mono font-medium">✓ Allows Prefix (Active)</span>
+                          ) : (
+                            <span className="text-amber-400 font-mono font-medium">🔒 No Prefix (Inactive)</span>
+                          )} · {currentDhatu.gana}
+                        </div>
+                        <div className="mt-2 text-[10px] text-indigo-400/70 font-mono">
+                          Click to cycle roots · ({dhatuIndex + 1}/{DHATUS.length} ⟳)
+                        </div>
                       </div>
-                    </div>
+                    )
                   ) : (
                     <div className="w-full py-1 flex flex-col items-center">
                       <input
@@ -1248,14 +1547,6 @@ export default function SanskritMorphEngine() {
                       </label>
                     </div>
                   )}
-
-                  <div className="mt-3 pt-3 border-t border-white/[0.06] w-full text-[11px] text-slate-400">
-                    <span className="text-indigo-300 font-mono">{currentDhatu.canHavePrefix ? "Takes Upasargas" : "Upasargas Disabled"}</span> · {currentDhatu.gana}
-                  </div>
-
-                  <div className="mt-2 text-[10px] text-indigo-400/70 font-mono">
-                    Click to cycle roots
-                  </div>
                 </div>
 
                 <div className="text-2xl font-light text-slate-600 select-none self-center">=</div>
@@ -1266,7 +1557,7 @@ export default function SanskritMorphEngine() {
                 >
                   <div className="absolute top-3 right-3 text-[10px] font-mono text-indigo-300 flex items-center gap-1">
                     <span className="px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-200">
-                      {activeOptionIndex + 1}/{activeOptionList.length}
+                      {dhatuIndex === -1 ? '0/0' : `${activeOptionIndex + 1}/${activeOptionList.length}`}
                     </span>
                   </div>
                   
@@ -1309,17 +1600,9 @@ export default function SanskritMorphEngine() {
                     </button>
                   </div>
 
-                  {/* 2. MULTI-OPTION EXPLORATION CHIPS (Options available for that specific root!) */}
-                  <div className="w-full flex items-center justify-between gap-1 mb-2">
-                    <button
-                      onClick={() => cycleOption(-1)}
-                      className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
-                      title="Previous Option"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-
-                    <div className="flex-1 flex flex-wrap items-center justify-center gap-1.5">
+                  {/* 2. SUB-OPTION PILLS: Explore Multiple Available Forms */}
+                  {dhatuIndex !== -1 && (
+                    <div className="w-full flex items-center justify-center gap-1 mb-2 flex-wrap">
                       {activeOptionList.map((opt, idx) => {
                         const isSelected = (activeOptionIndex % activeOptionList.length) === idx;
                         return (
@@ -1332,41 +1615,52 @@ export default function SanskritMorphEngine() {
                                 setSelectedNameIndex(idx);
                               }
                             }}
-                            className={`text-[10px] px-2 py-0.5 rounded-md font-mono transition-all ${
+                            className={`px-2 py-0.5 text-[10px] font-mono rounded-lg transition-all ${
                               isSelected
-                                ? 'bg-indigo-500/30 border border-indigo-400/60 text-white font-semibold shadow-sm'
-                                : 'bg-white/[0.03] text-slate-400 hover:text-slate-200 border border-white/[0.05]'
+                                ? 'bg-indigo-600 text-white font-semibold shadow-sm'
+                                : 'bg-white/[0.03] text-slate-400 hover:text-white hover:bg-white/[0.08] border border-white/[0.05]'
                             }`}
                           >
-                            <span>{opt.sanskrit}</span>
-                            <span className="text-[9px] text-indigo-300/80 ml-1">({opt.tag.split(' ')[0]})</span>
+                            {opt.tag}
                           </button>
                         );
                       })}
                     </div>
+                  )}
+
+                  {/* 3. DERIVED RESULT DISPLAY */}
+                  <div className="w-full flex items-center justify-between my-1">
+                    <button
+                      onClick={() => cycleOption(-1)}
+                      className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+                      title="Previous Option"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+
+                    <div 
+                      onClick={() => cycleOption(1)}
+                      className="cursor-pointer flex-1 flex flex-col items-center"
+                    >
+                      <div className="text-3xl md:text-4xl font-bold tracking-tight text-white my-1 group-hover:scale-105 transition-transform font-serif">
+                        {currentResult.sanskrit}
+                      </div>
+                      <div className="text-xs font-mono text-indigo-300">
+                        {currentResult.iast}
+                      </div>
+                    </div>
 
                     <button
                       onClick={() => cycleOption(1)}
-                      className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+                      className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
                       title="Next Option"
                     >
                       <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
 
-                  {/* Derivative Result Display (Click to cycle options) */}
-                  <div 
-                    onClick={() => cycleOption(1)}
-                    className="cursor-pointer py-1 group/res w-full flex flex-col items-center"
-                    title="Click to cycle next available derivative"
-                  >
-                    <div className="text-4xl md:text-5xl font-bold tracking-tight text-white my-1 group-hover/res:scale-105 transition-transform font-serif text-indigo-100">
-                      {currentResult.sanskrit}
-                    </div>
-                    <div className="text-sm font-mono text-indigo-300 mb-0.5">{currentResult.iast}</div>
-                    <div className="text-xs text-slate-200 italic min-h-[28px] flex items-center justify-center">
-                      &ldquo;{currentResult.meaning}&rdquo;
-                    </div>
+                  <div className="text-xs text-slate-300 italic min-h-[28px] flex items-center justify-center text-center">
+                    &ldquo;{currentResult.meaning}&rdquo;
                   </div>
 
                   {/* Context and Navigation Pill */}
@@ -1432,21 +1726,20 @@ export default function SanskritMorphEngine() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -15 }}
               transition={{ duration: 0.25 }}
-              className="w-full flex flex-col items-center"
+              className="flex flex-col items-center w-full max-w-5xl mx-auto"
             >
-              {/* Matrix Header Navigation Controls & Synced High-Level Toggle */}
-              <div className="w-full flex flex-col md:flex-row items-center justify-between gap-4 mb-6">
-                <button
-                  onClick={() => setCurrentStep('equation')}
-                  className="flex items-center gap-2 px-3.5 py-1.5 text-xs font-medium bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.08] rounded-xl transition-colors text-slate-300"
-                >
-                  <ArrowLeft className="w-3.5 h-3.5" />
-                  <span>Back to Step 1: Equation</span>
-                </button>
+              
+              {/* Matrix Control Header */}
+              <div className="w-full flex flex-col md:flex-row items-center justify-between gap-4 mb-6 pb-4 border-b border-white/[0.06]">
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setCurrentStep('equation')}
+                    className="p-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] text-slate-300 hover:text-white transition-colors"
+                    title="Return to Equation Dial"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                  </button>
 
-                {/* SYNCED HIGH-LEVEL TOGGLE & DERIVATIVE SELECTION PILLS */}
-                <div className="flex flex-col sm:flex-row items-center gap-2">
-                  
                   {/* Action vs Name toggle */}
                   <div className="flex items-center p-1 rounded-xl bg-black/40 border border-white/10 shadow-inner">
                     <button
@@ -1481,31 +1774,33 @@ export default function SanskritMorphEngine() {
                   </div>
 
                   {/* Sub-option pills for that category */}
-                  <div className="flex items-center gap-1 p-1 rounded-xl bg-white/[0.02] border border-white/[0.06]">
-                    {activeOptionList.map((opt, idx) => {
-                      const isSelected = (activeOptionIndex % activeOptionList.length) === idx;
-                      return (
-                        <button
-                          key={opt.id}
-                          onClick={() => {
-                            if (suffixTargetType === 'kriya') {
-                              setSelectedActionIndex(idx);
-                            } else {
-                              setSelectedNameIndex(idx);
-                            }
-                            showToast(`Paradigm Matrix recomputed for '${opt.sanskrit}'.`);
-                          }}
-                          className={`text-xs px-2.5 py-1 rounded-lg font-serif transition-all ${
-                            isSelected
-                              ? 'bg-indigo-600 text-white font-semibold shadow-sm'
-                              : 'text-slate-400 hover:text-white hover:bg-white/5'
-                          }`}
-                        >
-                          {opt.sanskrit}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  {dhatuIndex !== -1 && (
+                    <div className="flex items-center gap-1 p-1 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                      {activeOptionList.map((opt, idx) => {
+                        const isSelected = (activeOptionIndex % activeOptionList.length) === idx;
+                        return (
+                          <button
+                            key={opt.id}
+                            onClick={() => {
+                              if (suffixTargetType === 'kriya') {
+                                setSelectedActionIndex(idx);
+                              } else {
+                                setSelectedNameIndex(idx);
+                              }
+                              showToast(`Paradigm Matrix recomputed for '${opt.sanskrit}'.`);
+                            }}
+                            className={`text-xs px-2.5 py-1 rounded-lg font-serif transition-all ${
+                              isSelected
+                                ? 'bg-indigo-600 text-white font-semibold shadow-sm'
+                                : 'text-slate-400 hover:text-white hover:bg-white/5'
+                            }`}
+                          >
+                            {opt.sanskrit}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
 
                 </div>
 
@@ -1534,103 +1829,128 @@ export default function SanskritMorphEngine() {
               </div>
 
               {/* CLUTTER-FREE TRANSPARENT MATRIX GRID */}
-              <div className="w-full overflow-x-auto my-2 pb-4">
-                <div className="min-w-[720px] grid grid-cols-4 gap-2 text-sm">
-                  
-                  {/* Top-Left Header: Category */}
-                  <div className="p-3 text-xs font-mono uppercase tracking-wider text-slate-500 border-b border-white/[0.06] flex items-center">
-                    {dynamicMatrixData.type === 'nama' ? 'Vibhakti (Case)' : 'Puruṣa (Person)'}
+              {dhatuIndex === -1 || dynamicMatrixData.rows.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-20 text-center w-full border border-dashed border-white/10 rounded-2xl p-8">
+                  <div className="w-14 h-14 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center mb-4 text-indigo-400">
+                    <Table className="w-7 h-7" />
                   </div>
-
-                  {/* Vacana Columns (Singular, Dual, Plural) */}
-                  {VACANA_HEADERS.map((header, colIdx) => (
-                    <div key={colIdx} className="p-3 text-center border-b border-white/[0.06]">
-                      <div className="text-xs font-serif font-semibold text-indigo-300">{header.sanskrit}</div>
-                      <div className="text-[10px] font-mono text-slate-500 uppercase">{header.english}</div>
+                  <h3 className="text-lg font-serif font-bold text-white mb-2">No Root Word Selected</h3>
+                  <p className="text-xs text-slate-400 max-w-md mb-6 leading-relaxed">
+                    Prefix dial is inactive and set to None by default. Select a root word in Step 1 to dynamically calculate and render the paradigm matrix.
+                  </p>
+                  <button
+                    onClick={() => {
+                      setCurrentStep('equation');
+                      setIsRootQuickSelectOpen(true);
+                    }}
+                    className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-lg shadow-indigo-600/30 flex items-center gap-2"
+                  >
+                    <Compass className="w-4 h-4" />
+                    <span>Choose a Root Word (१३)</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="w-full overflow-x-auto my-2 pb-4">
+                  <div className="min-w-[720px] grid grid-cols-4 gap-2 text-sm">
+                    
+                    {/* Top-Left Header: Category */}
+                    <div className="p-3 text-xs font-mono uppercase tracking-wider text-slate-500 border-b border-white/[0.06] flex items-center">
+                      {dynamicMatrixData.type === 'nama' ? 'Vibhakti (Case)' : 'Puruṣa (Person)'}
                     </div>
-                  ))}
 
-                  {/* Matrix Data Rows */}
-                  {dynamicMatrixData.rows.map((row, rowIdx) => (
-                    <React.Fragment key={rowIdx}>
-                      
-                      {/* Row Label (Case / Person) */}
-                      <div className="p-4 flex flex-col justify-center border-b border-white/[0.03] text-left">
-                        <span className="text-sm font-semibold text-white font-serif">{row.sanskritName}</span>
-                        <span className="text-[11px] text-slate-400">{row.name}</span>
-                        <span className="text-[10px] text-slate-500 italic">{row.meaning}</span>
+                    {/* Vacana Columns (Singular, Dual, Plural) */}
+                    {VACANA_HEADERS.map((header, colIdx) => (
+                      <div key={colIdx} className="p-3 text-center border-b border-white/[0.06]">
+                        <div className="text-xs font-serif font-semibold text-indigo-300">{header.sanskrit}</div>
+                        <div className="text-[10px] font-mono text-slate-500 uppercase">{header.english}</div>
                       </div>
+                    ))}
 
-                      {/* 3 Number Form Cells */}
-                      {row.forms.map((form, colIdx) => {
-                        const isSelected = selectedRowIndex === rowIdx && selectedColIndex === colIdx;
-                        return (
-                          <div 
-                            key={colIdx}
-                            onClick={() => {
-                              setSelectedRowIndex(rowIdx);
-                              setSelectedColIndex(colIdx);
-                              speakSanskrit(form);
-                            }}
-                            className={`group relative p-4 flex flex-col items-center justify-center cursor-pointer transition-all rounded-xl border ${
-                              isSelected 
-                                ? 'bg-indigo-600/15 border-indigo-400/40 shadow-[0_0_25px_rgba(99,102,241,0.25)] text-indigo-100' 
-                                : 'border-transparent hover:bg-white/[0.03] text-slate-200'
-                            }`}
-                          >
-                            <span className={`text-2xl md:text-3xl font-serif font-bold tracking-tight transition-transform group-hover:scale-105 ${
-                              isSelected ? 'text-indigo-200' : 'text-slate-100'
-                            }`}>
-                              {form}
-                            </span>
-                            <span className="text-[10px] font-mono text-slate-500 mt-1">
-                              {VACANA_HEADERS[colIdx].sanskrit}
-                            </span>
-
-                            {isSelected && (
-                              <div className="absolute top-2.5 right-2.5 w-1.5 h-1.5 rounded-full bg-indigo-400 animate-ping" />
-                            )}
+                    {/* Dynamic Data Rows */}
+                    {dynamicMatrixData.rows.map((row, rowIdx) => {
+                      const isCurrentRow = (selectedRowIndex % dynamicMatrixData.rows.length) === rowIdx;
+                      return (
+                        <React.Fragment key={rowIdx}>
+                          {/* Row Header */}
+                          <div className={`p-3.5 rounded-xl flex flex-col justify-center transition-colors ${
+                            isCurrentRow ? 'bg-indigo-500/10 text-white border border-indigo-500/20' : 'text-slate-400 bg-white/[0.01]'
+                          }`}>
+                            <span className="font-serif font-medium text-sm text-slate-200">{row.sanskritName}</span>
+                            <span className="text-[11px] text-slate-400 font-mono line-clamp-1">{row.name}</span>
+                            <span className="text-[10px] text-indigo-400/80 italic">{row.meaning}</span>
                           </div>
-                        );
-                      })}
-                    </React.Fragment>
-                  ))}
 
-                </div>
-              </div>
+                          {/* 3 Vacana Cells */}
+                          {row.forms.map((cellForm, colIdx) => {
+                            const isSelectedCell = isCurrentRow && (selectedColIndex % 3) === colIdx;
+                            return (
+                              <button
+                                key={colIdx}
+                                onClick={() => {
+                                  setSelectedRowIndex(rowIdx);
+                                  setSelectedColIndex(colIdx);
+                                  speakSanskrit(cellForm);
+                                }}
+                                className={`p-3.5 rounded-xl font-serif text-base md:text-lg transition-all text-center flex flex-col items-center justify-center gap-1 border ${
+                                  isSelectedCell
+                                    ? 'bg-gradient-to-br from-indigo-600/30 via-indigo-600/20 to-purple-600/30 border-indigo-400 text-white shadow-lg shadow-indigo-500/25 scale-[1.02]'
+                                    : 'bg-white/[0.015] border-white/[0.04] text-slate-300 hover:bg-white/[0.05] hover:border-white/10 hover:text-white'
+                                }`}
+                              >
+                                <span className="font-bold">{cellForm}</span>
+                                {isSelectedCell && (
+                                  <span className="text-[9px] font-mono text-indigo-300 flex items-center gap-1 uppercase tracking-wider">
+                                    <Sparkles className="w-2.5 h-2.5" />
+                                    Active Form
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
+                        </React.Fragment>
+                      );
+                    })}
 
-              {/* Active Matrix Cell Details Card */}
-              <div className="w-full max-w-3xl mt-4 p-6 rounded-2xl bg-gradient-to-b from-white/[0.03] to-transparent border border-white/[0.06] flex flex-col sm:flex-row items-center justify-between gap-4 backdrop-blur-md">
-                <div>
-                  <span className="text-[10px] font-mono uppercase tracking-widest text-indigo-400 block mb-1">
-                    SELECTED PARADIGM CELL ({suffixTargetType === 'kriya' ? 'ACTION' : 'NAME'})
-                  </span>
-                  <div className="flex items-baseline gap-3">
-                    <span className="text-3xl font-serif font-bold text-white">{activeMatrixCellForm}</span>
-                    <span className="text-xs text-slate-400 font-mono">
-                      {activeMatrixRow.sanskritName} · {VACANA_HEADERS[selectedColIndex].sanskrit} ({VACANA_HEADERS[selectedColIndex].english})
-                    </span>
                   </div>
                 </div>
+              )}
 
-                <div className="flex items-center gap-2.5">
-                  <button
-                    onClick={() => speakSanskrit(activeMatrixCellForm)}
-                    className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] rounded-xl text-slate-300 transition-colors"
-                  >
-                    <Volume2 className="w-3.5 h-3.5 text-indigo-400" />
-                    <span>Pronounce</span>
-                  </button>
+              {/* Active Cell Action & Detail Bar */}
+              {dhatuIndex !== -1 && dynamicMatrixData.rows.length > 0 && (
+                <div className="w-full mt-6 p-4 rounded-2xl bg-white/[0.02] border border-white/[0.06] flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-300">
+                      <Sparkles className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg font-serif font-bold text-white">{activeMatrixCellForm}</span>
+                        <span className="text-xs font-mono text-indigo-300">[{activeMatrixRow.sanskritName} · {VACANA_HEADERS[selectedColIndex % 3].sanskrit}]</span>
+                      </div>
+                      <p className="text-xs text-slate-400">
+                        {activeMatrixRow.name} · {VACANA_HEADERS[selectedColIndex % 3].english} ({activeMatrixRow.meaning})
+                      </p>
+                    </div>
+                  </div>
 
-                  <button
-                    onClick={() => saveActiveExpression('matrix')}
-                    className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/40 text-indigo-200 rounded-xl transition-colors"
-                  >
-                    <Bookmark className="w-3.5 h-3.5" />
-                    <span>Save to Notebook</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => speakSanskrit(activeMatrixCellForm)}
+                      className="px-3 py-1.5 text-xs font-mono rounded-xl bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.08] text-indigo-300 hover:text-white transition-colors flex items-center gap-1.5"
+                    >
+                      <Volume2 className="w-3.5 h-3.5" />
+                      <span>Hear</span>
+                    </button>
+                    <button
+                      onClick={() => saveActiveExpression('matrix')}
+                      className="px-3 py-1.5 text-xs font-medium rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white transition-all shadow-md shadow-indigo-600/25 flex items-center gap-1.5"
+                    >
+                      <Bookmark className="w-3.5 h-3.5" />
+                      <span>Save Form</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
             </motion.div>
           )}
@@ -1643,154 +1963,140 @@ export default function SanskritMorphEngine() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -15 }}
               transition={{ duration: 0.25 }}
-              className="w-full flex flex-col items-center"
+              className="flex flex-col items-center w-full max-w-4xl mx-auto"
             >
-              {/* Back to Step 2 and Sub-Header */}
-              <div className="w-full flex items-center justify-between gap-4 mb-6">
+              
+              {/* Etymology Header */}
+              <div className="w-full flex items-center justify-between mb-6 pb-4 border-b border-white/[0.06]">
                 <button
                   onClick={() => setCurrentStep('matrix')}
-                  className="flex items-center gap-2 px-3.5 py-1.5 text-xs font-medium bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.08] rounded-xl transition-colors text-slate-300"
+                  className="p-2 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.08] text-slate-300 hover:text-white transition-colors flex items-center gap-2 text-xs"
                 >
-                  <ArrowLeft className="w-3.5 h-3.5" />
-                  <span>Back to Step 2: Paradigm Matrix</span>
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Back to Matrix</span>
                 </button>
 
-                <div className="inline-flex items-center gap-1.5 text-[11px] font-mono text-indigo-400 px-2.5 py-1 rounded bg-indigo-500/10 border border-indigo-500/20">
-                  <BookOpen className="w-3.5 h-3.5" />
-                  <span>Pāṇinian Aṣṭādhyāyī Analysis ({suffixTargetType === 'kriya' ? 'Tiṅanta' : 'Subanta'})</span>
+                <div className="text-right">
+                  <span className="text-[10px] font-mono text-indigo-400 uppercase tracking-widest block">
+                    PĀṆINIAN ETYMOLOGICAL ANALYSIS
+                  </span>
+                  <span className="text-xs font-medium text-slate-300">
+                    {currentEtymology.sutraType}
+                  </span>
                 </div>
               </div>
 
-              {/* Central Title */}
-              <div className="text-center mb-8">
-                <span className="text-xs tracking-widest text-indigo-400 uppercase font-mono mb-2 block">
-                  MORPHOLOGICAL DERIVATION & SŪTRAS
-                </span>
-                <h2 className="text-2xl md:text-3xl font-light tracking-tight text-white font-serif">
-                  {currentUpasarga.isNone ? "केवल-धातु" : `${currentUpasarga.sanskrit} + ${currentDhatu.sanskrit}`} = {currentResult.sanskrit}
-                </h2>
-                <p className="text-xs text-slate-400 mt-1">
-                  Morphological deconstruction for <span className="text-indigo-300 font-semibold">{suffixTargetType === 'kriya' ? 'Action Word (क्रियापदम्)' : 'Name Word (नामपदम्)'}</span> according to Pāṇinian sūtras.
-                </p>
-              </div>
-
-              {/* THREE-TIER ANALYSIS CARD SYSTEM */}
-              <div className="w-full max-w-4xl space-y-6">
+              {/* Main Analysis Card */}
+              <div className="w-full p-6 md:p-8 rounded-3xl bg-gradient-to-b from-white/[0.04] via-indigo-950/[0.1] to-transparent border border-white/[0.08] backdrop-blur-xl shadow-2xl flex flex-col gap-6">
                 
-                {/* 1. PRIMARY PĀṆINIAN SŪTRA CARD */}
-                <div className="p-6 md:p-8 rounded-2xl bg-gradient-to-b from-white/[0.04] to-transparent border border-white/[0.07] backdrop-blur-md shadow-2xl relative">
-                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                    <span className="text-[11px] font-mono uppercase tracking-widest text-indigo-400 flex items-center gap-1.5">
-                      <ScrollText className="w-3.5 h-3.5" />
-                      <span>Primary Pāṇinian Sūtra</span>
-                    </span>
-                    <span className="text-xs font-mono px-2 py-0.5 rounded bg-indigo-950/80 border border-indigo-800/40 text-indigo-300">
-                      {currentEtymology.sutraNumber}
-                    </span>
+                {/* Sūtra Banner */}
+                <div className="p-5 rounded-2xl bg-indigo-950/40 border border-indigo-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div>
+                    <div className="text-[10px] font-mono uppercase tracking-wider text-indigo-400 mb-1">
+                      PRIMARY PĀṆINIAN SŪTRA · {currentEtymology.sutraNumber}
+                    </div>
+                    <h3 className="text-xl md:text-2xl font-serif font-bold text-white">
+                      {currentEtymology.sutra}
+                    </h3>
                   </div>
-
-                  <h3 className="text-2xl md:text-3xl font-bold font-serif text-white tracking-wide my-2">
-                    &ldquo;{currentEtymology.sutra}&rdquo;
-                  </h3>
-
-                  <div className="text-xs text-indigo-300/80 font-mono mb-3">
-                    Type: {currentEtymology.sutraType}
-                  </div>
-
-                  <p className="text-sm text-slate-300 leading-relaxed font-serif">
-                    {currentEtymology.sutraExplanation}
-                  </p>
+                  <span className="text-xs font-mono px-3 py-1 rounded-xl bg-indigo-500/20 text-indigo-200 border border-indigo-500/30 whitespace-nowrap">
+                    {currentEtymology.sutraType}
+                  </span>
                 </div>
 
-                {/* 2. STEP-BY-STEP MORPHOLOGICAL DERIVATION */}
-                <div className="p-6 md:p-8 rounded-2xl bg-gradient-to-b from-white/[0.03] to-transparent border border-white/[0.06] backdrop-blur-md">
-                  <div className="flex items-center gap-2 mb-6">
-                    <Layers className="w-4 h-4 text-indigo-400" />
-                    <h4 className="text-sm font-mono uppercase tracking-wider text-slate-300 font-semibold">
-                      Step-by-Step Derivation Process
-                    </h4>
-                  </div>
+                {/* Sūtra Explanation */}
+                <div className="text-sm text-slate-300 leading-relaxed font-sans">
+                  {currentEtymology.sutraExplanation}
+                </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {currentEtymology.derivationSteps.map((stepItem) => (
+                {/* Step-by-Step Morphological Derivation */}
+                <div>
+                  <h4 className="text-xs font-mono uppercase tracking-wider text-indigo-300 mb-4 flex items-center gap-2">
+                    <Workflow className="w-4 h-4" />
+                    <span>Step-by-Step Derivation Chain (प्रक्रिया)</span>
+                  </h4>
+
+                  <div className="space-y-3">
+                    {currentEtymology.derivationSteps.map((step) => (
                       <div 
-                        key={stepItem.step}
-                        className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:border-indigo-500/30 transition-all flex flex-col justify-between"
+                        key={step.step}
+                        className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.05] hover:border-indigo-500/20 transition-colors flex flex-col md:flex-row items-start md:items-center justify-between gap-3"
                       >
-                        <div>
-                          <div className="flex items-center justify-between text-[10px] font-mono text-slate-500 mb-2">
-                            <span>STEP 0{stepItem.step}</span>
-                            <span className="text-indigo-400 font-semibold">{stepItem.sutraRule.split(' ')[0]}</span>
+                        <div className="flex items-start gap-3">
+                          <div className="w-7 h-7 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-xs font-mono flex items-center justify-center shrink-0">
+                            {step.step}
                           </div>
-                          <h5 className="text-xs font-semibold text-white mb-1.5">
-                            {stepItem.title}
-                          </h5>
-                          <p className="text-[11px] text-slate-400 leading-normal mb-3">
-                            {stepItem.description}
-                          </p>
+                          <div>
+                            <div className="text-xs font-semibold text-white flex items-center gap-2">
+                              <span>{step.title}</span>
+                              <span className="text-[10px] font-mono text-indigo-400">({step.sutraRule})</span>
+                            </div>
+                            <p className="text-xs text-slate-400 mt-0.5">{step.description}</p>
+                          </div>
                         </div>
-                        <div className="pt-2 border-t border-white/[0.04] text-xs font-mono text-indigo-300 font-bold">
-                          {stepItem.intermediate}
+
+                        <div className="text-sm font-serif font-bold text-indigo-200 px-3 py-1 rounded-lg bg-black/30 border border-white/5 shrink-0">
+                          {step.intermediate}
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* 3. POETIC NUANCE & EXAMPLE CONTEXT SENTENCE */}
-                <div className="p-6 md:p-8 rounded-2xl bg-gradient-to-b from-white/[0.03] to-transparent border border-white/[0.06] backdrop-blur-md space-y-6">
+                {/* Poetic Nuance & Context Sentences */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-white/[0.06]">
                   
                   {/* Poetic Nuance */}
-                  <div>
-                    <div className="flex items-center gap-2 mb-2">
-                      <Feather className="w-4 h-4 text-indigo-400" />
-                      <h4 className="text-sm font-mono uppercase tracking-wider text-slate-300 font-semibold">
-                        Semantic Nuance & Pāṇinian Rule Application
-                      </h4>
-                    </div>
-                    <p className="text-sm text-slate-300 italic font-serif leading-relaxed">
+                  <div className="p-4 rounded-2xl bg-white/[0.015] border border-white/[0.05] flex flex-col gap-2">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-purple-300 flex items-center gap-1.5">
+                      <Feather className="w-3.5 h-3.5" />
+                      <span>Poetic & Semantic Nuance</span>
+                    </span>
+                    <p className="text-xs text-slate-300 italic leading-relaxed">
                       &ldquo;{currentEtymology.poeticNuance}&rdquo;
                     </p>
-                    <p className="text-xs text-slate-500 mt-1 font-mono">
+                    <p className="text-[11px] text-slate-400 mt-auto pt-2 border-t border-white/[0.04]">
                       {currentEtymology.literaryContext}
                     </p>
                   </div>
 
-                  {/* Classical Sentence Example */}
-                  <div className="p-5 rounded-xl bg-indigo-950/20 border border-indigo-500/20">
-                    <div className="text-[10px] font-mono uppercase tracking-widest text-indigo-400 mb-1 flex items-center justify-between">
-                      <span>LITERARY CONTEXT & USAGE EXAMPLE</span>
-                      <span>{currentEtymology.exampleSentence.source}</span>
-                    </div>
-                    <div className="text-xl font-serif text-white font-bold my-2">
+                  {/* Classical Example Sentence */}
+                  <div className="p-4 rounded-2xl bg-white/[0.015] border border-white/[0.05] flex flex-col gap-2">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-cyan-300 flex items-center gap-1.5">
+                      <BookOpen className="w-3.5 h-3.5" />
+                      <span>Classical Usage Example</span>
+                    </span>
+                    <div className="text-base font-serif font-bold text-white">
                       {currentEtymology.exampleSentence.sanskrit}
                     </div>
-                    <div className="text-xs font-mono text-indigo-300/80 mb-2">
+                    <div className="text-xs font-mono text-indigo-300">
                       {currentEtymology.exampleSentence.iast}
                     </div>
                     <div className="text-xs text-slate-300 italic">
                       &ldquo;{currentEtymology.exampleSentence.translation}&rdquo;
                     </div>
+                    <div className="text-[10px] font-mono text-slate-500 mt-auto pt-2 border-t border-white/[0.04]">
+                      Source: {currentEtymology.exampleSentence.source}
+                    </div>
                   </div>
 
                 </div>
 
-                {/* Bottom Action Buttons */}
-                <div className="flex flex-wrap items-center justify-center gap-3.5 pt-4">
+                {/* Actions */}
+                <div className="flex items-center justify-end gap-3 pt-4 border-t border-white/[0.06]">
                   <button
                     onClick={() => saveActiveExpression('etymology')}
-                    className="flex items-center gap-2 px-5 py-2.5 text-xs font-medium bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.08] rounded-xl text-slate-300 hover:text-white transition-colors"
+                    className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.08] rounded-xl transition-colors text-slate-300 hover:text-white"
                   >
                     <Bookmark className="w-3.5 h-3.5 text-indigo-400" />
                     <span>Save Analysis to Notebook</span>
                   </button>
-
                   <button
                     onClick={() => setCurrentStep('equation')}
-                    className="flex items-center gap-2 px-5 py-2.5 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition-all shadow-lg shadow-indigo-600/30"
+                    className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl transition-colors"
                   >
-                    <Workflow className="w-3.5 h-3.5" />
-                    <span>Return to Workflow Studio</span>
+                    <span>Return to Dial</span>
+                    <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 </div>
 
@@ -1803,29 +2109,23 @@ export default function SanskritMorphEngine() {
 
       </main>
 
-      {/* ================= MODAL: ALL 22 UPASARGAS QUICK-SELECT ================= */}
+      {/* ================= ALL 22 UPASARGAS QUICK SELECT MODAL ================= */}
       <AnimatePresence>
         {isPrefixQuickSelectOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsPrefixQuickSelectOpen(false)}
-              className="absolute inset-0 bg-black/70 backdrop-blur-md"
-            />
-            
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="relative w-full max-w-4xl max-h-[85vh] bg-[#0c111a] border border-white/[0.08] rounded-2xl p-6 overflow-y-auto shadow-2xl z-10"
+              className="w-full max-w-4xl bg-[#0e1422] border border-white/10 rounded-2xl p-6 shadow-2xl max-h-[85vh] flex flex-col"
             >
-              <div className="flex items-center justify-between pb-4 border-b border-white/[0.06] mb-4">
+              <div className="flex items-center justify-between pb-4 border-b border-white/10">
                 <div>
-                  <h3 className="text-lg font-semibold text-white">The 22 Sanskrit Upasargas (द्वाविंशति उपसर्गाः)</h3>
-                  <p className="text-xs text-slate-400 font-mono">
-                    Select any prefix to apply to root sound &lsquo;{currentDhatu.sanskrit}&rsquo;
+                  <h3 className="text-lg font-serif font-bold text-white flex items-center gap-2">
+                    <span>The 22 Classical Sanskrit Upasargas (द्वाविंशति उपसर्गाः)</span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Click any prefix to instantly apply it to the equation dial, or choose &lsquo;None&rsquo; for base root alone.
                   </p>
                 </div>
                 <button
@@ -1836,65 +2136,223 @@ export default function SanskritMorphEngine() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                {STANDARD_22_UPASARGAS.map((upasarga, idx) => {
-                  const isSelected = savedUpasargaIndex === idx && currentDhatu.canHavePrefix;
-                  return (
-                    <div
-                      key={idx}
-                      onClick={() => {
-                        setSavedUpasargaIndex(idx);
-                        setIsPrefixQuickSelectOpen(false);
-                      }}
-                      className={`p-3.5 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
-                        isSelected 
-                          ? 'bg-indigo-600/20 border-indigo-400/50 shadow-md shadow-indigo-500/10' 
-                          : 'bg-white/[0.02] border-white/[0.05] hover:bg-white/[0.05] hover:border-indigo-500/30'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-2xl font-bold font-serif text-white">{upasarga.sanskrit}</span>
-                        <span className="text-[11px] font-mono text-indigo-300">{upasarga.iast}</span>
-                      </div>
-                      <div className="text-xs text-slate-300 font-medium mb-1 line-clamp-1">
-                        {upasarga.meaning}
-                      </div>
-                      <div className="text-[10px] text-slate-400 line-clamp-2 leading-relaxed">
-                        {upasarga.nuance}
-                      </div>
+              <div className="overflow-y-auto py-4 space-y-4 flex-1 pr-1">
+                {/* None Option */}
+                <div
+                  onClick={() => {
+                    setSavedUpasargaIndex(-1);
+                    setIsPrefixQuickSelectOpen(false);
+                  }}
+                  className={`p-3.5 rounded-xl border cursor-pointer transition-all flex items-center justify-between ${
+                    savedUpasargaIndex === -1
+                      ? 'bg-indigo-600/20 border-indigo-400/50 shadow-md shadow-indigo-500/10'
+                      : 'bg-white/[0.02] border-white/[0.05] hover:bg-white/[0.05] hover:border-indigo-500/30'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-2xl font-bold font-serif text-slate-300">—</span>
+                    <div>
+                      <div className="text-xs font-mono text-indigo-300">None (केवल-धातु)</div>
+                      <div className="text-[11px] text-slate-400">Base root sound without prepositional prefix</div>
                     </div>
-                  );
-                })}
+                  </div>
+                  <span className="text-xs font-mono px-2 py-0.5 rounded bg-white/5 text-slate-400">
+                    No Upasarga
+                  </span>
+                </div>
+
+                {/* 22 Upasargas Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                  {STANDARD_22_UPASARGAS.map((upasarga, idx) => {
+                    const isSelected = savedUpasargaIndex === idx && isPrefixActive;
+                    return (
+                      <div
+                        key={idx}
+                        onClick={() => {
+                          setSavedUpasargaIndex(idx);
+                          setIsPrefixQuickSelectOpen(false);
+                        }}
+                        className={`p-3.5 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
+                          isSelected 
+                            ? 'bg-indigo-600/20 border-indigo-400/50 shadow-md shadow-indigo-500/10' 
+                            : 'bg-white/[0.02] border-white/[0.05] hover:bg-white/[0.05] hover:border-indigo-500/30'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-2xl font-bold font-serif text-white">{upasarga.sanskrit}</span>
+                          <span className="text-[11px] font-mono text-indigo-300">{upasarga.iast}</span>
+                        </div>
+                        <div className="text-xs text-slate-300 font-medium mb-1 line-clamp-1">
+                          {upasarga.meaning}
+                        </div>
+                        <div className="text-[10px] text-slate-400 line-clamp-2 leading-relaxed">
+                          {upasarga.nuance}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
 
-      {/* ================= SAVED NOTEBOOK DRAWER / SLIDE-OVER ================= */}
+      {/* ================= ROOT QUICK SELECT MODAL ================= */}
+      <AnimatePresence>
+        {isRootQuickSelectOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-3xl bg-[#0e1422] border border-white/10 rounded-2xl p-6 shadow-2xl max-h-[85vh] flex flex-col"
+            >
+              <div className="flex items-center justify-between pb-4 border-b border-white/10">
+                <div>
+                  <h3 className="text-lg font-serif font-bold text-white flex items-center gap-2">
+                    <Compass className="w-5 h-5 text-indigo-400" />
+                    <span>Select Root Word (धातु / प्रातिपदिक)</span>
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    Choose a verbal Dhātu (activates prefix dial) or nominal Prātipadika (prefix stays inactive &amp; none).
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsRootQuickSelectOpen(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/5"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="overflow-y-auto py-4 space-y-6 flex-1 pr-1">
+                {/* Section 1: Verbal Roots */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-emerald-300 font-mono flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                      VERBAL ROOTS (क्रियावाचक धातु · 10) — ALLOWS UPASARGAS
+                    </span>
+                    <span className="text-[11px] text-slate-500 font-mono">Prefix dial becomes ACTIVE</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                    {DHATUS.filter(d => d.canHavePrefix).map((dhatu) => {
+                      const originalIndex = DHATUS.findIndex(d => d.sanskrit === dhatu.sanskrit);
+                      const isSelected = dhatuIndex === originalIndex;
+                      return (
+                        <div
+                          key={dhatu.sanskrit}
+                          onClick={() => selectDhatuByIndex(originalIndex)}
+                          className={`p-3 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
+                            isSelected
+                              ? 'bg-emerald-600/20 border-emerald-400/50 shadow-md shadow-emerald-500/10'
+                              : 'bg-white/[0.02] border-white/[0.05] hover:bg-white/[0.05] hover:border-emerald-500/30'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-2xl font-bold font-serif text-white">{dhatu.sanskrit}</span>
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                              Allows Prefix
+                            </span>
+                          </div>
+                          <div className="text-xs font-mono text-indigo-300 mb-0.5">{dhatu.iast}</div>
+                          <div className="text-xs text-slate-300 font-medium line-clamp-1 mb-1">
+                            {dhatu.meaning}
+                          </div>
+                          <div className="text-[10px] text-slate-400 line-clamp-1">
+                            {dhatu.gana}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Section 2: Nominal Stems */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-amber-300 font-mono flex items-center gap-1.5">
+                      <Lock className="w-3 h-3 text-amber-400" />
+                      NOMINAL STEMS (नामपद / प्रातिपदिक · 3) — NO UPASARGA
+                    </span>
+                    <span className="text-[11px] text-slate-500 font-mono">Prefix stays INACTIVE &amp; NONE</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                    {DHATUS.filter(d => !d.canHavePrefix).map((dhatu) => {
+                      const originalIndex = DHATUS.findIndex(d => d.sanskrit === dhatu.sanskrit);
+                      const isSelected = dhatuIndex === originalIndex;
+                      return (
+                        <div
+                          key={dhatu.sanskrit}
+                          onClick={() => selectDhatuByIndex(originalIndex)}
+                          className={`p-3 rounded-xl border cursor-pointer transition-all flex flex-col justify-between ${
+                            isSelected
+                              ? 'bg-amber-600/20 border-amber-400/50 shadow-md shadow-amber-500/10'
+                              : 'bg-white/[0.02] border-white/[0.05] hover:bg-white/[0.05] hover:border-amber-500/30'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-2xl font-bold font-serif text-white">{dhatu.sanskrit}</span>
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                              Prefix Inactive
+                            </span>
+                          </div>
+                          <div className="text-xs font-mono text-indigo-300 mb-0.5">{dhatu.iast}</div>
+                          <div className="text-xs text-slate-300 font-medium line-clamp-1 mb-1">
+                            {dhatu.meaning}
+                          </div>
+                          <div className="text-[10px] text-slate-400 line-clamp-1">
+                            {dhatu.gana}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="pt-4 border-t border-white/10 flex items-center justify-between">
+                <button
+                  onClick={() => selectDhatuByIndex(-1)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-mono text-slate-400 hover:text-white hover:bg-white/5 border border-white/10 transition-colors"
+                >
+                  Reset to None (— Default)
+                </button>
+                <button
+                  onClick={() => setIsRootQuickSelectOpen(false)}
+                  className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-white/10 hover:bg-white/15 text-white transition-colors"
+                >
+                  Close
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ================= SAVED NOTEBOOK SLIDE-OUT DRAWER ================= */}
       <AnimatePresence>
         {isNotebookOpen && (
-          <div className="fixed inset-0 z-50 flex justify-end">
-            
-            {/* Backdrop */}
+          <div className="fixed inset-0 z-50 overflow-hidden">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsNotebookOpen(false)}
-              className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+              className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
             />
 
-            {/* Slide-over Drawer Panel */}
             <motion.div
-              initial={{ x: "100%" }}
+              initial={{ x: '100%' }}
               animate={{ x: 0 }}
-              exit={{ x: "100%" }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-              className="relative w-full max-w-md h-full bg-[#0d121c] border-l border-white/[0.08] p-6 flex flex-col justify-between shadow-2xl z-10"
+              exit={{ x: '100%' }}
+              transition={{ type: 'spring', damping: 25, stiffness: 220 }}
+              className="absolute inset-y-0 right-0 max-w-md w-full bg-[#0e1422] border-l border-white/10 p-6 shadow-2xl flex flex-col justify-between"
             >
-              {/* Drawer Header */}
               <div>
+                {/* Drawer Header */}
                 <div className="flex items-center justify-between pb-4 border-b border-white/[0.06]">
                   <div className="flex items-center gap-2.5">
                     <BookMarked className="w-5 h-5 text-indigo-400" />
@@ -2052,19 +2510,37 @@ export default function SanskritMorphEngine() {
           <div className="flex-1 max-w-2xl px-4 text-center md:text-left">
             <p className="text-xs md:text-sm text-slate-300 font-serif leading-relaxed">
               {currentStep === 'equation' && (
-                <>
-                  &ldquo;Root <span className="text-indigo-300 font-sans font-semibold">&lsquo;{currentDhatu.sanskrit}&rsquo;</span> with prefix <span className="text-indigo-300 font-sans font-semibold">&lsquo;{currentUpasarga.sanskrit}&rsquo;</span> derived as {suffixTargetType === 'kriya' ? 'Action Word' : 'Name Word'} <span className="text-white font-sans font-bold">&lsquo;{currentResult.sanskrit}&rsquo;</span> ({currentResult.tag}). Generates {suffixTargetType === 'kriya' ? '3 × 3 verbal matrix' : '7 × 3 nominal matrix'}.&rdquo;
-                </>
+                dhatuIndex === -1 ? (
+                  <>
+                    &ldquo;Prefix dial is <span className="text-slate-300 font-sans font-semibold">inactive for toggle and set to None by default</span>. Select a root word in the Root Dial to activate prefix toggling.&rdquo;
+                  </>
+                ) : (
+                  <>
+                    &ldquo;Root <span className="text-indigo-300 font-sans font-semibold">&lsquo;{currentDhatu.sanskrit}&rsquo;</span> with {currentUpasarga.isNone ? 'no prefix (केवल)' : <>prefix <span className="text-indigo-300 font-sans font-semibold">&lsquo;{currentUpasarga.sanskrit}&rsquo;</span></>} derived as {suffixTargetType === 'kriya' ? 'Action Word' : 'Name Word'} <span className="text-white font-sans font-bold">&lsquo;{currentResult.sanskrit}&rsquo;</span> ({currentResult.tag}). Generates {suffixTargetType === 'kriya' ? '3 × 3 verbal matrix' : '7 × 3 nominal matrix'}.&rdquo;
+                  </>
+                )
               )}
               {currentStep === 'matrix' && (
-                <>
-                  &ldquo;Visualizing <span className="text-indigo-300 font-sans font-semibold">{dynamicMatrixData.title}</span> ({suffixTargetType === 'kriya' ? '3 × 3 Action Conjugation' : '7 × 3 Name Declension'}). Selected cell <span className="text-white font-sans font-bold">&lsquo;{activeMatrixCellForm}&rsquo;</span>.&rdquo;
-                </>
+                dhatuIndex === -1 ? (
+                  <>
+                    &ldquo;Select a root word in Step 1 to dynamically calculate and render the paradigm matrix.&rdquo;
+                  </>
+                ) : (
+                  <>
+                    &ldquo;Visualizing <span className="text-indigo-300 font-sans font-semibold">{dynamicMatrixData.title}</span> ({suffixTargetType === 'kriya' ? '3 × 3 Action Conjugation' : '7 × 3 Name Declension'}). Selected cell <span className="text-white font-sans font-bold">&lsquo;{activeMatrixCellForm}&rsquo;</span>.&rdquo;
+                  </>
+                )
               )}
               {currentStep === 'etymology' && (
-                <>
-                  &ldquo;Pāṇinian analysis for <span className="text-indigo-300 font-sans font-semibold">{currentResult.sanskrit}</span> ({currentResult.tag}): governed by <span className="text-indigo-300 font-sans font-semibold">{currentEtymology.sutraNumber}</span>.&rdquo;
-                </>
+                dhatuIndex === -1 ? (
+                  <>
+                    &ldquo;Pāṇinian derivation engine: Root words branch into verbal and nominal systems.&rdquo;
+                  </>
+                ) : (
+                  <>
+                    &ldquo;Pāṇinian analysis for <span className="text-indigo-300 font-sans font-semibold">{currentResult.sanskrit}</span> ({currentResult.tag}): governed by <span className="text-indigo-300 font-sans font-semibold">{currentEtymology.sutraNumber}</span>.&rdquo;
+                  </>
+                )
               )}
             </p>
           </div>
@@ -2074,7 +2550,7 @@ export default function SanskritMorphEngine() {
             <button
               onClick={() => {
                 const textToSpeak = currentStep === 'equation' 
-                  ? currentResult.sanskrit 
+                  ? (dhatuIndex === -1 ? "संस्कृत पद निष्पत्ति" : currentResult.sanskrit) 
                   : currentStep === 'matrix' 
                     ? activeMatrixCellForm 
                     : currentEtymology.sutra.split(' ')[0];
