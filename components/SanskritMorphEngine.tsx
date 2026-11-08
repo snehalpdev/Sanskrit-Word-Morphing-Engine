@@ -3,10 +3,10 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
-  Volume2, VolumeX, Sparkles, RefreshCw, Bookmark, 
+  Volume2, VolumeX, Sparkles, Bookmark, 
   Keyboard, Compass, Mic, Atom, BookOpen, Grid, Layers, ArrowRight, ArrowLeft,
   Check, Copy, Trash2, X, ScrollText, Feather, Activity,
-  Workflow, Table, BookMarked, ShieldAlert, ChevronDown
+  Workflow, Table, BookMarked, ShieldAlert, ChevronDown, ChevronLeft, ChevronRight
 } from 'lucide-react';
 
 interface Upasarga {
@@ -30,13 +30,18 @@ interface Dhatu {
   nounGender?: 'masc' | 'neut' | 'fem';
 }
 
-interface SuffixResult {
+interface SuffixOption {
+  id: string;
   sanskrit: string;
   iast: string;
   meaning: string;
   context: string;
+  tag: string; // e.g. "घञ्", "ल्युट्", "क्त", "लट्", "लोट्"
   category: 'tinanta' | 'krdanta' | 'subanta';
   targetType: 'kriya' | 'nama';
+  gender?: 'masc' | 'neut' | 'fem';
+  tenseMood?: string; // e.g. "Present (Laṭ)", "Imperative (Loṭ)"
+  atmanepada?: boolean;
 }
 
 interface DerivationStep {
@@ -273,9 +278,9 @@ const VACANA_HEADERS = [
 ];
 
 // -------------------------------------------------------------------
-// Synthesizes Action Word (Tiṅanta) and Name Word (Subanta) Derivatives
+// Synthesizes MULTIPLE Action Word (Tiṅanta) and Name Word (Subanta) Options
 // -------------------------------------------------------------------
-function getDerivedPair(upasarga: Upasarga, dhatu: Dhatu): { actionWord: SuffixResult; nameWord: SuffixResult } {
+function getDerivedOptions(upasarga: Upasarga, dhatu: Dhatu): { actionWords: SuffixOption[]; nameWords: SuffixOption[] } {
   const isNone = upasarga.isNone || !dhatu.canHavePrefix;
   const pDev = isNone ? '' : upasarga.sanskrit;
   const pIast = isNone ? '' : upasarga.iast.replace(/ \(.*\)/, '');
@@ -284,118 +289,193 @@ function getDerivedPair(upasarga: Upasarga, dhatu: Dhatu): { actionWord: SuffixR
   // Inherent nominal stem
   if (dhatu.type === 'nama' || !dhatu.canHavePrefix) {
     const isNeuter = dDev === 'ज्ञान';
-    const nomNoun = isNeuter ? `${dDev}म्` : `${dDev}ः`;
+    const mainNom = isNeuter ? `${dDev}म्` : `${dDev}ः`;
     return {
-      actionWord: {
-        sanskrit: `${dDev}ायते`,
-        iast: `${dhatu.iast}āyate`,
-        meaning: `acts like ${dhatu.meaning.toLowerCase()} (Denominative verb / नामधातु)`,
-        context: "Nāmadhātu Present Indicative (क्योङ् प्रत्ययः ३.१.११)",
-        category: "tinanta",
-        targetType: "kriya"
-      },
-      nameWord: {
-        sanskrit: nomNoun,
-        iast: isNeuter ? `${dhatu.iast}m` : `${dhatu.iast}ḥ`,
-        meaning: `${dhatu.meaning} (Subanta Noun)`,
-        context: "Nominal Prātipadika (प्रातिपदिकार्थलिङ्गपरिमाणवचनमात्रे प्रथमा २.३.४६)",
-        category: "subanta",
-        targetType: "nama"
-      }
+      actionWords: [
+        {
+          id: 'act-1',
+          sanskrit: `${dDev}ायते`,
+          iast: `${dhatu.iast}āyate`,
+          meaning: `acts like ${dhatu.meaning.toLowerCase()} (Present)`,
+          context: "Denominative Verb (Nāmadhātu Laṭ, क्योङ् प्रत्ययः ३.१.११)",
+          tag: "लट् (Present)",
+          category: "tinanta",
+          targetType: "kriya",
+          tenseMood: "Present Indicative (Laṭ)",
+          atmanepada: true
+        },
+        {
+          id: 'act-2',
+          sanskrit: `${dDev}ायताम्`,
+          iast: `${dhatu.iast}āyatām`,
+          meaning: `let him act like ${dhatu.meaning.toLowerCase()} (Imperative)`,
+          context: "Denominative Verb (Nāmadhātu Loṭ, Imperative)",
+          tag: "लोट् (Imperative)",
+          category: "tinanta",
+          targetType: "kriya",
+          tenseMood: "Imperative (Loṭ)",
+          atmanepada: true
+        },
+        {
+          id: 'act-3',
+          sanskrit: `${dDev}ायेत`,
+          iast: `${dhatu.iast}āyeta`,
+          meaning: `may he act like ${dhatu.meaning.toLowerCase()} (Potential)`,
+          context: "Denominative Verb (Nāmadhātu Vidčiliṅ, Potential)",
+          tag: "विधिलिङ् (Optative)",
+          category: "tinanta",
+          targetType: "kriya",
+          tenseMood: "Optative (Vidčiliṅ)",
+          atmanepada: true
+        }
+      ],
+      nameWords: [
+        {
+          id: 'nom-1',
+          sanskrit: mainNom,
+          iast: isNeuter ? `${dhatu.iast}m` : `${dhatu.iast}ḥ`,
+          meaning: `${dhatu.meaning} (Base Noun / प्रातिपदिक)`,
+          context: "Nominal Stem (प्रातिपदिकार्थलिङ्गपरिमाणवचनमात्रे प्रथमा २.३.४६)",
+          tag: "मूल-प्रातिपदिकम्",
+          category: "subanta",
+          targetType: "nama",
+          gender: isNeuter ? 'neut' : 'masc'
+        },
+        {
+          id: 'nom-2',
+          sanskrit: `${dDev}त्वम्`,
+          iast: `${dhatu.iast}tvam`,
+          meaning: `the essence / quality of ${dhatu.meaning.toLowerCase()} (Abstract Noun)`,
+          context: "Taddhita Abstract Suffix (त्व-प्रत्ययः ५.१.११९)",
+          tag: "त्व (Abstract)",
+          category: "subanta",
+          targetType: "nama",
+          gender: 'neut'
+        },
+        {
+          id: 'nom-3',
+          sanskrit: `${dDev}मयम्`,
+          iast: `${dhatu.iast}mayam`,
+          meaning: `replete with / imbued with ${dhatu.meaning.toLowerCase()}`,
+          context: "Taddhita Suffix (मयट्-प्रत्ययः ५.४.२१)",
+          tag: "मयट् (Imbued)",
+          category: "subanta",
+          targetType: "nama",
+          gender: 'neut'
+        }
+      ]
     };
   }
 
   // Pre-mapped combinations for authentic classical forms
   const comboKey = `${pDev || 'none'}-${dDev}`;
 
-  const SPECIAL_MAP: Record<string, { actionWord: SuffixResult; nameWord: SuffixResult }> = {
+  const SPECIAL_MAP: Record<string, { actionWords: SuffixOption[]; nameWords: SuffixOption[] }> = {
     "प्र-रम्": {
-      actionWord: { sanskrit: "प्ररमते", iast: "praramate", meaning: "he rejoices exceedingly", context: "Present Indicative (Laṭ, 3rd Person Singular Ātmanepada)", category: "tinanta", targetType: "kriya" },
-      nameWord: { sanskrit: "प्ररामः", iast: "prarāmaḥ", meaning: "transcendent joy, ecstatic delight", context: "Primary Nominal Action Noun (Ghañ Pratyaya)", category: "subanta", targetType: "nama" }
+      actionWords: [
+        { id: 'act-1', sanskrit: "प्ररमते", iast: "praramate", meaning: "he rejoices exceedingly", context: "Present Indicative (Laṭ, 3rd Person Ātmanepada)", tag: "लट् (Present)", category: "tinanta", targetType: "kriya", tenseMood: "Present (Laṭ)", atmanepada: true },
+        { id: 'act-2', sanskrit: "प्ररमताम्", iast: "praramatām", meaning: "let him rejoice / celebrate", context: "Imperative Mood (Loṭ, 3rd Person)", tag: "लोट् (Imperative)", category: "tinanta", targetType: "kriya", tenseMood: "Imperative (Loṭ)", atmanepada: true },
+        { id: 'act-3', sanskrit: "प्ररमेत", iast: "prarameta", meaning: "may he take delight in truth", context: "Potential / Optative (Vidčiliṅ)", tag: "विधिलिङ् (Optative)", category: "tinanta", targetType: "kriya", tenseMood: "Optative (Vidčiliṅ)", atmanepada: true },
+        { id: 'act-4', sanskrit: "प्ररेमे", iast: "prareme", meaning: "he took profound delight", context: "Perfect Past (Liṭ Lakāra)", tag: "लिट् (Past)", category: "tinanta", targetType: "kriya", tenseMood: "Perfect (Liṭ)", atmanepada: true }
+      ],
+      nameWords: [
+        { id: 'nom-1', sanskrit: "प्ररामः", iast: "prarāmaḥ", meaning: "transcendent joy, ecstatic repose", context: "Primary Action Noun (Ghañ Pratyaya)", tag: "घञ् (Action Noun)", category: "subanta", targetType: "nama", gender: "masc" },
+        { id: 'nom-2', sanskrit: "प्ररमणम्", iast: "praramaṇam", meaning: "the act of supreme rejoicing", context: "Abstract Action Noun (Lyuṭ Pratyaya)", tag: "ल्युट् (Abstract)", category: "subanta", targetType: "nama", gender: "neut" },
+        { id: 'nom-3', sanskrit: "प्ररम्यः", iast: "praramyaḥ", meaning: "one worthy of being delighted in", context: "Gerundive Adjective (Kṛtya / Yat)", tag: "कृत्य (Gerundive)", category: "subanta", targetType: "nama", gender: "masc" },
+        { id: 'nom-4', sanskrit: "प्ररतिः", iast: "praratiḥ", meaning: "deep devotional joy, spiritual pleasure", context: "Feminine Action Noun (Ktin Pratyaya)", tag: "क्तिन् (Feminine)", category: "subanta", targetType: "nama", gender: "fem" }
+      ]
     },
     "वि-रम्": {
-      actionWord: { sanskrit: "विरमति", iast: "viramati", meaning: "he desists, pauses, stops", context: "Present Indicative (Laṭ, Parasmaipada by व्याङ्परिभ्यो रमः)", category: "tinanta", targetType: "kriya" },
-      nameWord: { sanskrit: "विरामः", iast: "virāmaḥ", meaning: "cessation, pause, tranquil rest", context: "Nominal Action Noun (Ghañ)", category: "subanta", targetType: "nama" }
-    },
-    "आ-रम्": {
-      actionWord: { sanskrit: "आरभते", iast: "ārabhate", meaning: "he commences resolutely", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
-      nameWord: { sanskrit: "आरम्भः", iast: "ārambhaḥ", meaning: "commencement, inception, enterprise", context: "Primary Nominal Derivative (Ghañ)", category: "subanta", targetType: "nama" }
-    },
-    "सम्-रम्": {
-      actionWord: { sanskrit: "संरमते", iast: "saṃramate", meaning: "he becomes intensely excited", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
-      nameWord: { sanskrit: "संरम्भः", iast: "saṃrambhaḥ", meaning: "impetuosity, righteous fervor", context: "Nominal Derivative (Ghañ)", category: "subanta", targetType: "nama" }
+      actionWords: [
+        { id: 'act-1', sanskrit: "विरमति", iast: "viramati", meaning: "he desists, stops, pauses", context: "Present Indicative (Laṭ, Parasmaipada by व्याङ्परिभ्यो रमः)", tag: "लट् (Present)", category: "tinanta", targetType: "kriya", tenseMood: "Present (Laṭ)", atmanepada: false },
+        { id: 'act-2', sanskrit: "विरमतु", iast: "viramatu", meaning: "let him desist from wrongful action", context: "Imperative Mood (Loṭ)", tag: "लोट् (Imperative)", category: "tinanta", targetType: "kriya", tenseMood: "Imperative (Loṭ)", atmanepada: false },
+        { id: 'act-3', sanskrit: "विरमेत्", iast: "viramet", meaning: "he should pause / desist", context: "Potential Mood (Vidčiliṅ)", tag: "विधिलिङ् (Optative)", category: "tinanta", targetType: "kriya", tenseMood: "Optative (Vidčiliṅ)", atmanepada: false },
+        { id: 'act-4', sanskrit: "अविरमत्", iast: "aviramat", meaning: "he desisted / paused", context: "Imperfect Past (Laṅ Lakāra)", tag: "लङ् (Past)", category: "tinanta", targetType: "kriya", tenseMood: "Imperfect (Laṅ)", atmanepada: false }
+      ],
+      nameWords: [
+        { id: 'nom-1', sanskrit: "विरामः", iast: "virāmaḥ", meaning: "cessation, pause, tranquil rest", context: "Nominal Action Noun (Ghañ)", tag: "घञ् (Action Noun)", category: "subanta", targetType: "nama", gender: "masc" },
+        { id: 'nom-2', sanskrit: "विरमणम्", iast: "viramaṇam", meaning: "the act of desisting or pausing", context: "Action Noun (Lyuṭ Pratyaya)", tag: "ल्युट् (Abstract)", category: "subanta", targetType: "nama", gender: "neut" },
+        { id: 'nom-3', sanskrit: "विरतिः", iast: "viratiḥ", meaning: "dispassion, quietude, stopping", context: "Feminine Action Noun (Ktin)", tag: "क्तिन् (Feminine)", category: "subanta", targetType: "nama", gender: "fem" },
+        { id: 'nom-4', sanskrit: "विरतः", iast: "virataḥ", meaning: "one who has ceased / turned away", context: "Past Passive Participle (Kta)", tag: "क्त (Participle)", category: "subanta", targetType: "nama", gender: "masc" }
+      ]
     },
     "आ-गम्": {
-      actionWord: { sanskrit: "आगच्छति", iast: "āgacchati", meaning: "he arrives, comes", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
-      nameWord: { sanskrit: "आगमनम्", iast: "āgamanam", meaning: "arrival, advent", context: "Action Noun (Lyut Pratyaya)", category: "subanta", targetType: "nama" }
-    },
-    "अनु-गम्": {
-      actionWord: { sanskrit: "अनुगच्छति", iast: "anugacchati", meaning: "he follows, accompanies", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
-      nameWord: { sanskrit: "अनुगमनम्", iast: "anugamanam", meaning: "following, discipleship", context: "Action Noun (Lyut)", category: "subanta", targetType: "nama" }
-    },
-    "सम्-गम्": {
-      actionWord: { sanskrit: "सङ्गच्छते", iast: "saṅgacchate", meaning: "they unite, converge in harmony", context: "Present Indicative (Laṭ, Ātmanepada)", category: "tinanta", targetType: "kriya" },
-      nameWord: { sanskrit: "सङ्गमः", iast: "saṅgamaḥ", meaning: "sacred confluence, meeting of souls", context: "Nominal Action Noun (Ghañ)", category: "subanta", targetType: "nama" }
-    },
-    "उत्-गम्": {
-      actionWord: { sanskrit: "उद्गच्छति", iast: "udgacchati", meaning: "he ascends, rises upward", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
-      nameWord: { sanskrit: "उद्गमः", iast: "udgamaḥ", meaning: "emergence, origin, spring", context: "Nominal Derivative (Ghañ)", category: "subanta", targetType: "nama" }
+      actionWords: [
+        { id: 'act-1', sanskrit: "आगच्छति", iast: "āgacchati", meaning: "he comes, arrives", context: "Present Indicative (Laṭ, 3rd Person)", tag: "लट् (Present)", category: "tinanta", targetType: "kriya", tenseMood: "Present (Laṭ)", atmanepada: false },
+        { id: 'act-2', sanskrit: "आगच्छतु", iast: "āgacchatu", meaning: "let him arrive / welcome", context: "Imperative Mood (Loṭ)", tag: "लोट् (Imperative)", category: "tinanta", targetType: "kriya", tenseMood: "Imperative (Loṭ)", atmanepada: false },
+        { id: 'act-3', sanskrit: "आगच्छेत्", iast: "āgacchet", meaning: "may he arrive soon", context: "Potential Mood (Vidčiliṅ)", tag: "विधिलिङ् (Optative)", category: "tinanta", targetType: "kriya", tenseMood: "Optative (Vidčiliṅ)", atmanepada: false },
+        { id: 'act-4', sanskrit: "आगमिष्यति", iast: "āgamiṣyati", meaning: "he will arrive in future", context: "Simple Future (Lṛṭ Lakāra)", tag: "लृट् (Future)", category: "tinanta", targetType: "kriya", tenseMood: "Future (Lṛṭ)", atmanepada: false }
+      ],
+      nameWords: [
+        { id: 'nom-1', sanskrit: "आगमनम्", iast: "āgamanam", meaning: "arrival, advent, coming", context: "Action Noun (Lyuṭ Pratyaya)", tag: "ल्युट् (Arrival)", category: "subanta", targetType: "nama", gender: "neut" },
+        { id: 'nom-2', sanskrit: "आगमः", iast: "āgamaḥ", meaning: "canonical scripture, sacred arrival", context: "Primary Nominal Derivative (Ghañ)", tag: "घञ् (Scripture)", category: "subanta", targetType: "nama", gender: "masc" },
+        { id: 'nom-3', sanskrit: "आगतः", iast: "āgataḥ", meaning: "the one who has arrived / guest", context: "Past Active Participle (Kta)", tag: "क्त (Arrived)", category: "subanta", targetType: "nama", gender: "masc" },
+        { id: 'nom-4', sanskrit: "आगतिः", iast: "āgatiḥ", meaning: "incoming return, arrival path", context: "Feminine Action Noun (Ktin)", tag: "क्तिन् (Feminine)", category: "subanta", targetType: "nama", gender: "fem" }
+      ]
     },
     "सम्-कृ": {
-      actionWord: { sanskrit: "संस्कुरुते", iast: "saṃskurute", meaning: "he refines, purifies, sanctifies", context: "Present Indicative (Laṭ, Suṭ-āgama)", category: "tinanta", targetType: "kriya" },
-      nameWord: { sanskrit: "संस्कारः", iast: "saṃskāraḥ", meaning: "sacrament, spiritual impression, culture", context: "Action Noun (Ghañ)", category: "subanta", targetType: "nama" }
-    },
-    "प्र-कृ": {
-      actionWord: { sanskrit: "प्रकरोति", iast: "prakaroti", meaning: "he executes, brings forth", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
-      nameWord: { sanskrit: "प्रकृतिः", iast: "prakṛtiḥ", meaning: "primal creative nature, matrix", context: "Feminine Action Noun (Ktin)", category: "subanta", targetType: "nama" }
-    },
-    "उप-कृ": {
-      actionWord: { sanskrit: "उपकरोति", iast: "upakaroti", meaning: "he benefits, aids, assists", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
-      nameWord: { sanskrit: "उपकारः", iast: "upakāraḥ", meaning: "benevolence, assistance, kindness", context: "Nominal Derivative (Ghañ)", category: "subanta", targetType: "nama" }
+      actionWords: [
+        { id: 'act-1', sanskrit: "संस्कुरुते", iast: "saṃskurute", meaning: "he refines, sanctifies (Ātmanepada)", context: "Present Indicative (Laṭ, Suṭ-āgama)", tag: "लट् (Ātmanepada)", category: "tinanta", targetType: "kriya", tenseMood: "Present (Laṭ)", atmanepada: true },
+        { id: 'act-2', sanskrit: "संस्करोति", iast: "saṃskaroti", meaning: "he purifies, consecrates (Parasmaipada)", context: "Present Indicative (Laṭ)", tag: "लट् (Parasmaipada)", category: "tinanta", targetType: "kriya", tenseMood: "Present (Laṭ)", atmanepada: false },
+        { id: 'act-3', sanskrit: "संस्कुरुताम्", iast: "saṃskurutām", meaning: "let him sanctify / purify", context: "Imperative Mood (Loṭ)", tag: "लोट् (Imperative)", category: "tinanta", targetType: "kriya", tenseMood: "Imperative (Loṭ)", atmanepada: true },
+        { id: 'act-4', sanskrit: "संस्कुर्यात्", iast: "saṃskuryāt", meaning: "he should purify with sacred rite", context: "Potential Mood (Vidčiliṅ)", tag: "विधिलिङ् (Optative)", category: "tinanta", targetType: "kriya", tenseMood: "Optative (Vidčiliṅ)", atmanepada: false }
+      ],
+      nameWords: [
+        { id: 'nom-1', sanskrit: "संस्कारः", iast: "saṃskāraḥ", meaning: "sacrament, spiritual impression, refinement", context: "Action Noun (Ghañ Pratyaya)", tag: "घञ् (Sacrament)", category: "subanta", targetType: "nama", gender: "masc" },
+        { id: 'nom-2', sanskrit: "संस्कृतम्", iast: "saṃskṛtam", meaning: "refined, perfected, sacred Sanskrit", context: "Past Passive Participle (Kta)", tag: "क्त (Refined)", category: "subanta", targetType: "nama", gender: "neut" },
+        { id: 'nom-3', sanskrit: "संस्कृतिः", iast: "saṃskṛtiḥ", meaning: "culture, sacred civilization", context: "Feminine Action Noun (Ktin)", tag: "क्तिन् (Culture)", category: "subanta", targetType: "nama", gender: "fem" },
+        { id: 'nom-4', sanskrit: "संस्कर्ता", iast: "saṃskartā", meaning: "consecrator, master refiner", context: "Agent Noun (Tṛc Pratyaya)", tag: "तृच् (Agent)", category: "subanta", targetType: "nama", gender: "masc" }
+      ]
     },
     "प्र-भू": {
-      actionWord: { sanskrit: "प्रभवति", iast: "prabhavati", meaning: "he originates, commands authority", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
-      nameWord: { sanskrit: "प्रभावः", iast: "prabhāvaḥ", meaning: "transcendent power, majesty, aura", context: "Nominal Derivative (Ghañ)", category: "subanta", targetType: "nama" }
-    },
-    "अनु-भू": {
-      actionWord: { sanskrit: "अनुभवति", iast: "anubhavati", meaning: "he experiences, perceives directly", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
-      nameWord: { sanskrit: "अनुभवः", iast: "anubhavaḥ", meaning: "direct experience, spiritual realization", context: "Nominal Derivative (Ghañ)", category: "subanta", targetType: "nama" }
-    },
-    "सम्-भू": {
-      actionWord: { sanskrit: "सम्भवति", iast: "sambhavati", meaning: "it becomes possible, coalesces", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
-      nameWord: { sanskrit: "सम्भवः", iast: "sambhavaḥ", meaning: "birth, manifestation, possibility", context: "Nominal Derivative (Ghañ)", category: "subanta", targetType: "nama" }
+      actionWords: [
+        { id: 'act-1', sanskrit: "प्रभवति", iast: "prabhavati", meaning: "he originates, holds sovereign mastery", context: "Present Indicative (Laṭ)", tag: "लट् (Present)", category: "tinanta", targetType: "kriya", tenseMood: "Present (Laṭ)", atmanepada: false },
+        { id: 'act-2', sanskrit: "प्रभवतु", iast: "prabhavatu", meaning: "let it manifest / originate", context: "Imperative Mood (Loṭ)", tag: "लोट् (Imperative)", category: "tinanta", targetType: "kriya", tenseMood: "Imperative (Loṭ)", atmanepada: false },
+        { id: 'act-3', sanskrit: "प्रभवेत्", iast: "prabhavet", meaning: "may it manifest and command", context: "Potential Mood (Vidčiliṅ)", tag: "विधिलिङ् (Optative)", category: "tinanta", targetType: "kriya", tenseMood: "Optative (Vidčiliṅ)", atmanepada: false },
+        { id: 'act-4', sanskrit: "प्राभवत्", iast: "prābhavat", meaning: "it originated / manifested", context: "Imperfect Past (Laṅ)", tag: "लङ् (Past)", category: "tinanta", targetType: "kriya", tenseMood: "Imperfect (Laṅ)", atmanepada: false }
+      ],
+      nameWords: [
+        { id: 'nom-1', sanskrit: "प्रभावः", iast: "prabhāvaḥ", meaning: "spiritual majesty, sovereign power, aura", context: "Action Noun (Ghañ)", tag: "घञ् (Power)", category: "subanta", targetType: "nama", gender: "masc" },
+        { id: 'nom-2', sanskrit: "प्रभवः", iast: "prabhavaḥ", meaning: "fountainhead, place of first origin", context: "Noun of Source (Ap Pratyaya)", tag: "अप् (Source)", category: "subanta", targetType: "nama", gender: "masc" },
+        { id: 'nom-3', sanskrit: "प्रभवनम्", iast: "prabhavanam", meaning: "the process of manifestation", context: "Action Noun (Lyuṭ)", tag: "ल्युट् (Process)", category: "subanta", targetType: "nama", gender: "neut" },
+        { id: 'nom-4', sanskrit: "प्रभुः", iast: "prabhuḥ", meaning: "sovereign master, supreme lord", context: "Agent Noun (Ku Pratyaya)", tag: "कु (Master)", category: "subanta", targetType: "nama", gender: "masc" }
+      ]
     },
     "प्र-स्था": {
-      actionWord: { sanskrit: "प्रतिष्ठते", iast: "pratiṣṭhate", meaning: "he departs, sets forth, abides", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
-      nameWord: { sanskrit: "प्रस्थानम्", iast: "prasthānam", meaning: "departure, sacred treatise, journey", context: "Action Noun (Lyut)", category: "subanta", targetType: "nama" }
-    },
-    "उत्-स्था": {
-      actionWord: { sanskrit: "उत्तिष्ठति", iast: "uttiṣṭhati", meaning: "he stands up, awakens, rises", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
-      nameWord: { sanskrit: "उत्थानम्", iast: "utthānam", meaning: "elevation, rising, spiritual awakening", context: "Action Noun (Lyut)", category: "subanta", targetType: "nama" }
+      actionWords: [
+        { id: 'act-1', sanskrit: "प्रतिष्ठते", iast: "pratiṣṭhate", meaning: "he departs, sets forth, abides", context: "Present Indicative (Laṭ)", tag: "लट् (Present)", category: "tinanta", targetType: "kriya", tenseMood: "Present (Laṭ)", atmanepada: true },
+        { id: 'act-2', sanskrit: "प्रतिष्ठताम्", iast: "pratiṣṭhatām", meaning: "let him set forth / depart", context: "Imperative Mood (Loṭ)", tag: "लोट् (Imperative)", category: "tinanta", targetType: "kriya", tenseMood: "Imperative (Loṭ)", atmanepada: true },
+        { id: 'act-3', sanskrit: "प्रतिष्ठेत", iast: "pratiṣṭheta", meaning: "may he be established in truth", context: "Potential Mood (Vidčiliṅ)", tag: "विधिलिङ् (Optative)", category: "tinanta", targetType: "kriya", tenseMood: "Optative (Vidčiliṅ)", atmanepada: true }
+      ],
+      nameWords: [
+        { id: 'nom-1', sanskrit: "प्रस्थानम्", iast: "prasthānam", meaning: "departure, sacred treatise, foundation", context: "Action Noun (Lyuṭ)", tag: "ल्युट् (Treatise)", category: "subanta", targetType: "nama", gender: "neut" },
+        { id: 'nom-2', sanskrit: "प्रतिष्ठा", iast: "pratiṣṭhā", meaning: "prestige, firm foundation, consecration", context: "Feminine Noun (Aṅ)", tag: "अङ् (Prestige)", category: "subanta", targetType: "nama", gender: "fem" },
+        { id: 'nom-3', sanskrit: "प्रस्थितः", iast: "prasthitaḥ", meaning: "one who has set forth on journey", context: "Past Participle (Kta)", tag: "क्त (Departed)", category: "subanta", targetType: "nama", gender: "masc" }
+      ]
     },
     "none-रम्": {
-      actionWord: { sanskrit: "रमते", iast: "ramate", meaning: "he delights, rejoices", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
-      nameWord: { sanskrit: "रामः", iast: "rāmaḥ", meaning: "delightful, noble person", context: "Action Noun / Epithet (Ghañ)", category: "subanta", targetType: "nama" }
+      actionWords: [
+        { id: 'act-1', sanskrit: "रमते", iast: "ramate", meaning: "he delights, rejoices", context: "Present Indicative (Laṭ)", tag: "लट् (Present)", category: "tinanta", targetType: "kriya", tenseMood: "Present (Laṭ)", atmanepada: true },
+        { id: 'act-2', sanskrit: "रमताम्", iast: "ramatām", meaning: "let him rejoice", context: "Imperative Mood (Loṭ)", tag: "लोट् (Imperative)", category: "tinanta", targetType: "kriya", tenseMood: "Imperative (Loṭ)", atmanepada: true },
+        { id: 'act-3', sanskrit: "रमेत", iast: "rameta", meaning: "may he take delight", context: "Potential Mood (Vidčiliṅ)", tag: "विधिलिङ् (Optative)", category: "tinanta", targetType: "kriya", tenseMood: "Optative (Vidčiliṅ)", atmanepada: true }
+      ],
+      nameWords: [
+        { id: 'nom-1', sanskrit: "रामः", iast: "rāmaḥ", meaning: "noble delight, the charming one", context: "Action Noun (Ghañ)", tag: "घञ् (Epithet)", category: "subanta", targetType: "nama", gender: "masc" },
+        { id: 'nom-2', sanskrit: "रमणम्", iast: "ramaṇam", meaning: "sporting, act of delighting", context: "Action Noun (Lyuṭ)", tag: "ल्युट् (Delighting)", category: "subanta", targetType: "nama", gender: "neut" },
+        { id: 'nom-3', sanskrit: "रतिः", iast: "ratiḥ", meaning: "pleasure, deep affection", context: "Feminine Noun (Ktin)", tag: "क्तिन् (Pleasure)", category: "subanta", targetType: "nama", gender: "fem" }
+      ]
     },
     "none-गम्": {
-      actionWord: { sanskrit: "गच्छति", iast: "gacchati", meaning: "he goes, moves", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
-      nameWord: { sanskrit: "गमनम्", iast: "gamanam", meaning: "going, transit", context: "Action Noun (Lyut)", category: "subanta", targetType: "nama" }
-    },
-    "none-कृ": {
-      actionWord: { sanskrit: "करोति", iast: "karoti", meaning: "he does, acts", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
-      nameWord: { sanskrit: "कार्यम्", iast: "kāryam", meaning: "duty, undertaking", context: "Gerundive Action Noun (Ṇyat)", category: "subanta", targetType: "nama" }
-    },
-    "none-भू": {
-      actionWord: { sanskrit: "भवति", iast: "bhavati", meaning: "he is, becomes", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
-      nameWord: { sanskrit: "भावः", iast: "bhāvaḥ", meaning: "state of being, emotion", context: "Action Noun (Ghañ)", category: "subanta", targetType: "nama" }
-    },
-    "none-स्था": {
-      actionWord: { sanskrit: "तिष्ठति", iast: "tiṣṭhati", meaning: "he stands, remains", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
-      nameWord: { sanskrit: "स्थानम्", iast: "sthānam", meaning: "abode, place, state", context: "Action Noun (Lyut)", category: "subanta", targetType: "nama" }
-    },
-    "none-पठ्": {
-      actionWord: { sanskrit: "पठति", iast: "paṭhati", meaning: "he reads, studies", context: "Present Indicative (Laṭ)", category: "tinanta", targetType: "kriya" },
-      nameWord: { sanskrit: "पाठः", iast: "pāṭhaḥ", meaning: "lesson, reading", context: "Action Noun (Ghañ)", category: "subanta", targetType: "nama" }
+      actionWords: [
+        { id: 'act-1', sanskrit: "गच्छति", iast: "gacchati", meaning: "he goes, moves", context: "Present Indicative (Laṭ)", tag: "लट् (Present)", category: "tinanta", targetType: "kriya", tenseMood: "Present (Laṭ)", atmanepada: false },
+        { id: 'act-2', sanskrit: "गच्छतु", iast: "gacchatu", meaning: "let him go", context: "Imperative Mood (Loṭ)", tag: "लोट् (Imperative)", category: "tinanta", targetType: "kriya", tenseMood: "Imperative (Loṭ)", atmanepada: false },
+        { id: 'act-3', sanskrit: "गच्छेत्", iast: "gacchet", meaning: "he should go", context: "Potential Mood (Vidčiliṅ)", tag: "विधिलिङ् (Optative)", category: "tinanta", targetType: "kriya", tenseMood: "Optative (Vidčiliṅ)", atmanepada: false }
+      ],
+      nameWords: [
+        { id: 'nom-1', sanskrit: "गमनम्", iast: "gamanam", meaning: "going, departure, transit", context: "Action Noun (Lyuṭ)", tag: "ल्युट् (Transit)", category: "subanta", targetType: "nama", gender: "neut" },
+        { id: 'nom-2', sanskrit: "गतिः", iast: "gatiḥ", meaning: "path, movement, spiritual refuge", context: "Feminine Action Noun (Ktin)", tag: "क्तिन् (Path)", category: "subanta", targetType: "nama", gender: "fem" },
+        { id: 'nom-3', sanskrit: "गतः", iast: "gataḥ", meaning: "the one who has gone", context: "Past Participle (Kta)", tag: "क्त (Gone)", category: "subanta", targetType: "nama", gender: "masc" }
+      ]
     }
   };
 
@@ -403,40 +483,99 @@ function getDerivedPair(upasarga: Upasarga, dhatu: Dhatu): { actionWord: SuffixR
     return SPECIAL_MAP[comboKey];
   }
 
-  // Fallback programmatic generation
-  let verb = dhatu.baseVerb || `${dDev}ति`;
-  let noun = dhatu.baseNoun || `${dDev}नम्`;
+  // Programmatic generator for other combinations
+  let verbStem = dhatu.baseVerb ? dhatu.baseVerb.replace(/(ति|ते)$/, '') : dDev;
+  let nounStem = dhatu.baseNoun ? dhatu.baseNoun.replace(/[ःम्]$/, '') : `${dDev}न`;
 
   if (pDev) {
     if (pDev === 'सम्') {
-      verb = `सं${verb}`;
-      noun = `सं${noun}`;
+      verbStem = `सं${verbStem}`;
+      nounStem = `सं${nounStem}`;
     } else if (pDev === 'उत्') {
-      verb = `उद्${verb}`;
-      noun = `उद्${noun}`;
+      verbStem = `उद्${verbStem}`;
+      nounStem = `उद्${nounStem}`;
     } else {
-      verb = `${pDev}${verb}`;
-      noun = `${pDev}${noun}`;
+      verbStem = `${pDev}${verbStem}`;
+      nounStem = `${pDev}${nounStem}`;
     }
   }
 
+  const isAtma = dhatu.atmanepada;
+
   return {
-    actionWord: {
-      sanskrit: verb,
-      iast: `${pIast}${dhatu.iast}ti`,
-      meaning: `he performs action of ${dhatu.meaning.toLowerCase()}`,
-      context: "Present Indicative (Laṭ Lakāra)",
-      category: "tinanta",
-      targetType: "kriya"
-    },
-    nameWord: {
-      sanskrit: noun,
-      iast: `${pIast}${dhatu.iast}am`,
-      meaning: `the act / entity of ${dhatu.meaning.toLowerCase()}`,
-      context: "Derived Nominal Stem (Subanta Pada)",
-      category: "subanta",
-      targetType: "nama"
-    }
+    actionWords: [
+      {
+        id: 'act-1',
+        sanskrit: isAtma ? `${verbStem}ते` : `${verbStem}ति`,
+        iast: `${pIast}${dhatu.iast}ti`,
+        meaning: `he performs action of ${dhatu.meaning.toLowerCase()} (Present)`,
+        context: "Present Indicative (Laṭ Lakāra)",
+        tag: "लट् (Present)",
+        category: "tinanta",
+        targetType: "kriya",
+        tenseMood: "Present (Laṭ)",
+        atmanepada: isAtma
+      },
+      {
+        id: 'act-2',
+        sanskrit: isAtma ? `${verbStem}ताम्` : `${verbStem}तु`,
+        iast: `${pIast}${dhatu.iast}tu`,
+        meaning: `let him ${dhatu.meaning.toLowerCase()} (Imperative)`,
+        context: "Imperative Mood (Loṭ Lakāra)",
+        tag: "लोट् (Imperative)",
+        category: "tinanta",
+        targetType: "kriya",
+        tenseMood: "Imperative (Loṭ)",
+        atmanepada: isAtma
+      },
+      {
+        id: 'act-3',
+        sanskrit: isAtma ? `${verbStem}ेत` : `${verbStem}ेत्`,
+        iast: `${pIast}${dhatu.iast}et`,
+        meaning: `may he ${dhatu.meaning.toLowerCase()} (Potential)`,
+        context: "Potential Mood (Vidčiliṅ)",
+        tag: "विधिलिङ् (Optative)",
+        category: "tinanta",
+        targetType: "kriya",
+        tenseMood: "Optative (Vidčiliṅ)",
+        atmanepada: isAtma
+      }
+    ],
+    nameWords: [
+      {
+        id: 'nom-1',
+        sanskrit: `${nounStem}म्`,
+        iast: `${pIast}${dhatu.iast}nam`,
+        meaning: `the act / process of ${dhatu.meaning.toLowerCase()}`,
+        context: "Neuter Action Noun (Lyuṭ Pratyaya)",
+        tag: "ल्युट् (Action Noun)",
+        category: "subanta",
+        targetType: "nama",
+        gender: "neut"
+      },
+      {
+        id: 'nom-2',
+        sanskrit: `${nounStem}ः`,
+        iast: `${pIast}${dhatu.iast}aḥ`,
+        meaning: `manifestation / entity of ${dhatu.meaning.toLowerCase()}`,
+        context: "Masculine Nominal Derivative (Ghañ)",
+        tag: "घञ् (Entity)",
+        category: "subanta",
+        targetType: "nama",
+        gender: "masc"
+      },
+      {
+        id: 'nom-3',
+        sanskrit: `${pDev}${dDev}तिः`,
+        iast: `${pIast}${dhatu.iast}tiḥ`,
+        meaning: `the state / condition of ${dhatu.meaning.toLowerCase()}`,
+        context: "Feminine Action Noun (Ktin)",
+        tag: "क्तिन् (State)",
+        category: "subanta",
+        targetType: "nama",
+        gender: "fem"
+      }
+    ]
   };
 }
 
@@ -458,6 +597,10 @@ export default function SanskritMorphEngine() {
 
   // HIGH-LEVEL TOGGLE IN SUFFIX DIAL: 'kriya' (Action Word) vs 'nama' (Name Word)
   const [suffixTargetType, setSuffixTargetType] = useState<'kriya' | 'nama'>('kriya');
+
+  // SUB-OPTION SELECTION: Multiple options available within the selected category!
+  const [selectedActionIndex, setSelectedActionIndex] = useState<number>(0);
+  const [selectedNameIndex, setSelectedNameIndex] = useState<number>(0);
 
   // Matrix cell selection
   const [selectedRowIndex, setSelectedRowIndex] = useState<number>(0);
@@ -501,119 +644,138 @@ export default function SanskritMorphEngine() {
     return STANDARD_22_UPASARGAS[savedUpasargaIndex % STANDARD_22_UPASARGAS.length];
   }, [currentDhatu.canHavePrefix, savedUpasargaIndex]);
 
-  // Suffix Derivation based on the High-Level Toggle (Action Word vs Name Word)
-  const derivedPair = useMemo(() => {
-    return getDerivedPair(currentUpasarga, currentDhatu);
+  // Suffix Derivation based on the High-Level Toggle & Multiple Options
+  const derivedOptions = useMemo(() => {
+    return getDerivedOptions(currentUpasarga, currentDhatu);
   }, [currentUpasarga, currentDhatu]);
 
-  const currentResult: SuffixResult = useMemo(() => {
-    return suffixTargetType === 'kriya' ? derivedPair.actionWord : derivedPair.nameWord;
-  }, [suffixTargetType, derivedPair]);
+  const activeOptionList = useMemo(() => {
+    return suffixTargetType === 'kriya' ? derivedOptions.actionWords : derivedOptions.nameWords;
+  }, [suffixTargetType, derivedOptions]);
+
+  const activeOptionIndex = suffixTargetType === 'kriya' ? selectedActionIndex : selectedNameIndex;
+
+  const currentResult: SuffixOption = useMemo(() => {
+    const list = activeOptionList;
+    return list[activeOptionIndex % list.length] || list[0];
+  }, [activeOptionList, activeOptionIndex]);
+
+  // Next / Previous cycle within current category
+  const cycleOption = (delta: number) => {
+    if (suffixTargetType === 'kriya') {
+      setSelectedActionIndex((prev) => {
+        const next = prev + delta;
+        const len = derivedOptions.actionWords.length;
+        return (next % len + len) % len;
+      });
+    } else {
+      setSelectedNameIndex((prev) => {
+        const next = prev + delta;
+        const len = derivedOptions.nameWords.length;
+        return (next % len + len) % len;
+      });
+    }
+  };
 
   // DYNAMIC PARADIGM MATRIX COMPUTATION:
-  // Directly computed and displayed based on whether suffixTargetType is 'nama' (7x3 grid) or 'kriya' (3x3 grid)!
+  // Directly computed and displayed based on the SPECIFIC SELECTED OPTION!
   const dynamicMatrixData = useMemo(() => {
     if (suffixTargetType === 'nama') {
       // 7 CASES × 3 NUMBERS (7 × 3 Nominal Grid)
-      const nominalWord = derivedPair.nameWord.sanskrit;
-      // Extract base without visarga or anusvara for inflections
-      let stem = nominalWord.replace(/[ःम्]$/, '');
-      const isNeuter = nominalWord.endsWith('म्') || nominalWord.endsWith('नम्');
+      const nominalWord = currentResult.sanskrit;
+      const gender = currentResult.gender || 'masc';
 
-      return {
-        type: 'nama' as const,
-        title: `${nominalWord} (Subanta Nominal Declension)`,
-        subtitle: "७ Vibhaktis (Cases) × ३ Vacanas (Numbers) — Name Word Paradigm",
-        rows: [
-          { 
-            name: "Prathamā (Nominative)", 
-            sanskritName: "प्रथमा", 
-            meaning: "Subject / Kartā", 
-            forms: isNeuter 
-              ? [`${stem}म्`, `${stem}े`, `${stem}ानि`] 
-              : [`${stem}ः`, `${stem}ौ`, `${stem}ाः`] 
-          },
-          { 
-            name: "Dvitīyā (Accusative)", 
-            sanskritName: "द्वितीया", 
-            meaning: "Direct Object / Karma", 
-            forms: isNeuter 
-              ? [`${stem}म्`, `${stem}े`, `${stem}ानि`] 
-              : [`${stem}म्`, `${stem}ौ`, `${stem}ान्`] 
-          },
-          { 
-            name: "Tṛtīyā (Instrumental)", 
-            sanskritName: "तृतीया", 
-            meaning: "By / With (Karaṇa)", 
-            forms: [`${stem}ेण`, `${stem}ाभ्याम्`, `${stem}ैः`] 
-          },
-          { 
-            name: "Caturthī (Dative)", 
-            sanskritName: "चतुर्थी", 
-            meaning: "For / Unto (Sampradāna)", 
-            forms: [`${stem}ाय`, `${stem}ाभ्याम्`, `${stem}ेभ्यः`] 
-          },
-          { 
-            name: "Pañcamī (Ablative)", 
-            sanskritName: "पञ्चमी", 
-            meaning: "From / Separation (Apādāna)", 
-            forms: [`${stem}ात्`, `${stem}ाभ्याम्`, `${stem}ेभ्यः`] 
-          },
-          { 
-            name: "Ṣaṣṭhī (Genitive)", 
-            sanskritName: "षष्ठी", 
-            meaning: "Of / Belonging to (Sambandha)", 
-            forms: [`${stem}स्य`, `${stem}योः`, `${stem}ानाम्`] 
-          },
-          { 
-            name: "Saptamī (Locative)", 
-            sanskritName: "सप्तमी", 
-            meaning: "In / At / Upon (Adhikaraṇa)", 
-            forms: [`${stem}े`, `${stem}योः`, `${stem}ेषु`] 
-          }
-        ]
-      };
+      if (gender === 'neut') {
+        let stem = nominalWord.replace(/म्$/, '');
+        return {
+          type: 'nama' as const,
+          title: `${nominalWord} [${currentResult.tag}]`,
+          subtitle: "७ Vibhaktis (Cases) × ३ Vacanas (Numbers) — Neuter Nominal Declension",
+          rows: [
+            { name: "Prathamā (Nominative)", sanskritName: "प्रथमा", meaning: "Subject / Kartā", forms: [`${stem}म्`, `${stem}े`, `${stem}ानि`] },
+            { name: "Dvitīyā (Accusative)", sanskritName: "द्वितीया", meaning: "Direct Object / Karma", forms: [`${stem}म्`, `${stem}े`, `${stem}ानि`] },
+            { name: "Tṛtīyā (Instrumental)", sanskritName: "तृतीया", meaning: "By / With (Karaṇa)", forms: [`${stem}ेन`, `${stem}ाभ्याम्`, `${stem}ैः`] },
+            { name: "Caturthī (Dative)", sanskritName: "चतुर्थी", meaning: "For / Unto (Sampradāna)", forms: [`${stem}ाय`, `${stem}ाभ्याम्`, `${stem}ेभ्यः`] },
+            { name: "Pañcamī (Ablative)", sanskritName: "पञ्चमी", meaning: "From / Separation (Apādāna)", forms: [`${stem}ात्`, `${stem}ाभ्याम्`, `${stem}ेभ्यः`] },
+            { name: "Ṣaṣṭhī (Genitive)", sanskritName: "षष्ठी", meaning: "Of / Belonging to (Sambandha)", forms: [`${stem}स्य`, `${stem}योः`, `${stem}ानाम्`] },
+            { name: "Saptamī (Locative)", sanskritName: "सप्तमी", meaning: "In / At / Upon (Adhikaraṇa)", forms: [`${stem}े`, `${stem}योः`, `${stem}ेषु`] }
+          ]
+        };
+      } else if (gender === 'fem') {
+        let stem = nominalWord.replace(/[ःा]$/, '');
+        return {
+          type: 'nama' as const,
+          title: `${nominalWord} [${currentResult.tag}]`,
+          subtitle: "७ Vibhaktis (Cases) × ३ Vacanas (Numbers) — Feminine Nominal Declension",
+          rows: [
+            { name: "Prathamā (Nominative)", sanskritName: "प्रथमा", meaning: "Subject / Kartā", forms: [`${stem}िः`, `${stem}ी`, `${stem}यः`] },
+            { name: "Dvitīyā (Accusative)", sanskritName: "द्वितीया", meaning: "Direct Object / Karma", forms: [`${stem}म्`, `${stem}ी`, `${stem}ीः`] },
+            { name: "Tṛtīyā (Instrumental)", sanskritName: "तृतीया", meaning: "By / With (Karaṇa)", forms: [`${stem}्या`, `${stem}िभ्याम्`, `${stem}िभिः`] },
+            { name: "Caturthī (Dative)", sanskritName: "चतुर्थी", meaning: "For / Unto (Sampradāna)", forms: [`${stem}ये`, `${stem}िभ्याम्`, `${stem}िभ्यः`] },
+            { name: "Pañcamī (Ablative)", sanskritName: "पञ्चमी", meaning: "From / Separation", forms: [`${stem}याः`, `${stem}िभ्याम्`, `${stem}िभ्यः`] },
+            { name: "Ṣaṣṭhī (Genitive)", sanskritName: "षष्ठी", meaning: "Of / Belonging to", forms: [`${stem}याः`, `${stem}योः`, `${stem}ीनाम्`] },
+            { name: "Saptamī (Locative)", sanskritName: "सप्तमी", meaning: "In / At / Upon", forms: [`${stem}याम्`, `${stem}योः`, `${stem}िषु`] }
+          ]
+        };
+      } else {
+        // Masculine Akārānta
+        let stem = nominalWord.replace(/[ःम्]$/, '');
+        return {
+          type: 'nama' as const,
+          title: `${nominalWord} [${currentResult.tag}]`,
+          subtitle: "७ Vibhaktis (Cases) × ३ Vacanas (Numbers) — Masculine Nominal Declension",
+          rows: [
+            { name: "Prathamā (Nominative)", sanskritName: "प्रथमा", meaning: "Subject / Kartā", forms: [`${stem}ः`, `${stem}ौ`, `${stem}ाः`] },
+            { name: "Dvitīyā (Accusative)", sanskritName: "द्वितीया", meaning: "Direct Object / Karma", forms: [`${stem}म्`, `${stem}ौ`, `${stem}ान्`] },
+            { name: "Tṛtīyā (Instrumental)", sanskritName: "तृतीया", meaning: "By / With (Karaṇa)", forms: [`${stem}ेण`, `${stem}ाभ्याम्`, `${stem}ैः`] },
+            { name: "Caturthī (Dative)", sanskritName: "चतुर्थी", meaning: "For / Unto (Sampradāna)", forms: [`${stem}ाय`, `${stem}ाभ्याम्`, `${stem}ेभ्यः`] },
+            { name: "Pañcamī (Ablative)", sanskritName: "पञ्चमी", meaning: "From / Separation", forms: [`${stem}ात्`, `${stem}ाभ्याम्`, `${stem}ेभ्यः`] },
+            { name: "Ṣaṣṭhī (Genitive)", sanskritName: "षष्ठी", meaning: "Of / Belonging to", forms: [`${stem}स्य`, `${stem}योः`, `${stem}ानाम्`] },
+            { name: "Saptamī (Locative)", sanskritName: "सप्तमी", meaning: "In / At / Upon", forms: [`${stem}े`, `${stem}योः`, `${stem}ेषु`] }
+          ]
+        };
+      }
     } else {
       // 3 PERSONS × 3 NUMBERS (3 × 3 Verbal Grid)
-      const actionWord = derivedPair.actionWord.sanskrit;
-      const isAtmanepada = actionWord.endsWith('ते') || currentDhatu.atmanepada;
-      let base = actionWord.replace(/(ति|ते)$/, '');
+      const actionWord = currentResult.sanskrit;
+      const isAtmanepada = currentResult.atmanepada || actionWord.endsWith('ते') || actionWord.endsWith('ताम्') || actionWord.endsWith('ेत');
+      const mood = currentResult.tenseMood || "Present (Laṭ)";
+
+      let base = actionWord.replace(/(ति|ते|तु|ताम्|त्|ेत)$/, '');
+
+      let r1: [string, string, string];
+      let r2: [string, string, string];
+      let r3: [string, string, string];
+
+      if (currentResult.tag.includes('लोट्')) {
+        // Imperative
+        r1 = isAtmanepada ? [`${base}ताम्`, `${base}ेताम्`, `${base}न्ताम्`] : [`${base}तु`, `${base}ताम्`, `${base}न्तु`];
+        r2 = isAtmanepada ? [`${base}स्व`, `${base}ेथाम्`, `${base}ध्वम्`] : [`${base}`, `${base}तम्`, `${base}त`];
+        r3 = isAtmanepada ? [`${base}ै`, `${base}ावहै`, `${base}ामहै`] : [`${base}ानि`, `${base}ाव`, `${base}ाम`];
+      } else if (currentResult.tag.includes('विधिलिङ्')) {
+        // Optative
+        r1 = isAtmanepada ? [`${base}ेत`, `${base}ेयाताम्`, `${base}ेरन्`] : [`${base}ेत्`, `${base}ेताम्`, `${base}ेयुः`];
+        r2 = isAtmanepada ? [`${base}ेथाः`, `${base}ेयाथाम्`, `${base}ेध्वम्`] : [`${base}ेः`, `${base}ेतम्`, `${base}ेत`];
+        r3 = isAtmanepada ? [`${base}ेय`, `${base}ेवहि`, `${base}ेमहि`] : [`${base}ेयम्`, `${base}ेव`, `${base}ेम`];
+      } else {
+        // Standard Present (Laṭ)
+        r1 = isAtmanepada ? [`${base}ते`, `${base}ेते`, `${base}न्ते`] : [`${base}ति`, `${base}तः`, `${base}न्ति`];
+        r2 = isAtmanepada ? [`${base}से`, `${base}ेथे`, `${base}ध्वे`] : [`${base}सि`, `${base}थः`, `${base}थ`];
+        r3 = isAtmanepada ? [`${base}े`, `${base}ावहे`, `${base}ामहे`] : [`${base}मि`, `${base}ावः`, `${base}ामः`];
+      }
 
       return {
         type: 'kriya' as const,
-        title: `${actionWord} (Tiṅanta Verbal Conjugation)`,
-        subtitle: isAtmanepada 
-          ? "३ Puruṣas × ३ Vacanas — Laṭ Lakāra (Present Ātmanepada)" 
-          : "३ Puruṣas × ३ Vacanas — Laṭ Lakāra (Present Parasmaipada)",
+        title: `${actionWord} [${currentResult.tag}]`,
+        subtitle: `३ Puruṣas × ३ Vacanas — ${mood}`,
         rows: [
-          { 
-            name: "Prathama Puruṣa (3rd Person)", 
-            sanskritName: "प्रथमपुरुषः", 
-            meaning: "He / She / They", 
-            forms: isAtmanepada 
-              ? [`${base}ते`, `${base}ेते`, `${base}न्ते`] 
-              : [`${base}ति`, `${base}तः`, `${base}न्ति`] 
-          },
-          { 
-            name: "Madhyama Puruṣa (2nd Person)", 
-            sanskritName: "मध्यमपुरुषः", 
-            meaning: "You (singular/dual/plural)", 
-            forms: isAtmanepada 
-              ? [`${base}से`, `${base}ेथे`, `${base}ध्वे`] 
-              : [`${base}सि`, `${base}थः`, `${base}थ`] 
-          },
-          { 
-            name: "Uttama Puruṣa (1st Person)", 
-            sanskritName: "उत्तमपुरुषः", 
-            meaning: "I / We two / We all", 
-            forms: isAtmanepada 
-              ? [`${base}े`, `${base}ावहे`, `${base}ामहे`] 
-              : [`${base}मि`, `${base}ावः`, `${base}ामः`] 
-          }
+          { name: "Prathama Puruṣa (3rd Person)", sanskritName: "प्रथमपुरुषः", meaning: "He / She / They", forms: r1 },
+          { name: "Madhyama Puruṣa (2nd Person)", sanskritName: "मध्यमपुरुषः", meaning: "You (singular/dual/plural)", forms: r2 },
+          { name: "Uttama Puruṣa (1st Person)", sanskritName: "उत्तमपुरुषः", meaning: "I / We two / We all", forms: r3 }
         ]
       };
     }
-  }, [suffixTargetType, derivedPair, currentDhatu]);
+  }, [suffixTargetType, currentResult]);
 
   const activeMatrixRow = dynamicMatrixData.rows[selectedRowIndex % dynamicMatrixData.rows.length];
   const activeMatrixCellForm = activeMatrixRow.forms[selectedColIndex % 3];
@@ -622,58 +784,58 @@ export default function SanskritMorphEngine() {
   const currentEtymology: EtymologyData = useMemo(() => {
     const isNama = suffixTargetType === 'nama';
     const sutraTitle = isNama
-      ? "कृत्तद्धितसमासाश्च (१.२.४६) & प्रातिपदिकार्थलिङ्गपरिमाणवचनमात्रे प्रथमा (२.३.४६)"
-      : "तिप्तस्झिसिप्थस्थमिब्वस्मस्तातांझथासाथांध्वमिड्वहिमहिङ् (३.४.७८) & कर्तरि शप् (३.१.६८)";
+      ? `कृत्तद्धितसमासाश्च (१.२.४६) — [${currentResult.tag}]`
+      : `तिप्तस्झिसिप्थस्थ... (३.४.७८) — [${currentResult.tag}]`;
 
     return {
       sutra: sutraTitle,
-      sutraNumber: isNama ? "अष्टाध्यायी १.२.४६ / २.३.४६" : "अष्टाध्यायी ३.४.७८ / ३.१.६८",
-      sutraType: isNama ? "सुबन्त-प्रक्रिया (Nominal Inflection)" : "तिङन्त-प्रक्रिया (Verbal Conjugation)",
+      sutraNumber: isNama ? "अष्टाध्यायी १.२.४६ / ३.३.१८" : "अष्टाध्यायी ३.४.७८ / ३.१.६८",
+      sutraType: isNama ? "कृदन्त / सुबन्त प्रक्रिया" : "तिङन्त / सार्वधातुक प्रक्रिया",
       sutraExplanation: isNama
-        ? `The root '${currentDhatu.sanskrit}' combines with nominal affix to form the Name Word '${currentResult.sanskrit}'. Pāṇinian sūtra १.२.४६ confers Prātipadika status, enabling the 21 nominal case endings (Sup) in a 7 × 3 matrix.`
-        : `The root '${currentDhatu.sanskrit}' takes the verbal personal terminations (Tiṅ) to form Action Word '${currentResult.sanskrit}', conjugating into the 3 Persons × 3 Numbers (3 × 3 matrix).`,
+        ? `The root sound '${currentDhatu.sanskrit}' combines with affix '${currentResult.tag}' to create the Name Word '${currentResult.sanskrit}'. Pāṇinian sūtra १.२.४६ grants Prātipadika status, generating the 7 × 3 nominal paradigm table.`
+        : `The root '${currentDhatu.sanskrit}' takes the personal inflectional affix '${currentResult.tag}' to create the Action Word '${currentResult.sanskrit}', generating the 3 × 3 verbal conjugation matrix.`,
       derivationSteps: [
         {
           step: 1,
-          title: isNama ? "Kṛt/Nominal Affixation" : "Sarvadhātuka Tiṅ Affixation",
+          title: isNama ? `Affixation of ${currentResult.tag}` : `Affixation of ${currentResult.tag}`,
           sutraRule: isNama ? "कृदतिङ् (३.१.९३)" : "कर्तरि शप् (३.१.६८)",
           description: isNama 
-            ? `The root is converted to a nominal noun stem expressing the outcome or agent of action.`
-            : `The root receives the thematic affix 'Śap' for active voice inflection.`,
-          intermediate: `${currentUpasarga.isNone ? '' : currentUpasarga.sanskrit + ' + '}${currentDhatu.sanskrit}`
+            ? `Root takes nominal suffix '${currentResult.tag}' to denote the noun/state: ${currentResult.meaning}.`
+            : `Root takes conjugational marker for active voice: ${currentResult.meaning}.`,
+          intermediate: `${currentUpasarga.isNone ? '' : currentUpasarga.sanskrit + ' + '}${currentDhatu.sanskrit} + ${currentResult.tag}`
         },
         {
           step: 2,
           title: "Morphophonemic Synthesis",
           sutraRule: "अचोऽन्त्यादि टि / सार्वधातुके",
-          description: "Internal phonetic harmony fuses prefix, root radical vowels, and terminations.",
+          description: "Internal phonetic sandhi fuses prefix, radical root sound, and thematic affix.",
           intermediate: currentResult.sanskrit
         },
         {
           step: 3,
-          title: isNama ? "7 × 3 Subanta Declension" : "3 × 3 Tiṅanta Conjugation",
+          title: isNama ? "7 × 3 Subanta Declension Matrix" : "3 × 3 Tiṅanta Conjugation Matrix",
           sutraRule: "सुप्तिङन्तं पदम् (१.४.१४)",
           description: isNama
-            ? `Inflected into the 7 cases (Vibhaktis) across singular, dual, and plural.`
-            : `Conjugated into 3 persons (Prathama, Madhyama, Uttama) across 3 numbers.`,
+            ? `Inflected into 7 cases (Vibhaktis) across singular, dual, and plural.`
+            : `Conjugated into 3 persons across 3 numbers for ${currentResult.tenseMood || 'Laṭ'}.`,
           intermediate: dynamicMatrixData.title
         }
       ],
       poeticNuance: isNama
-        ? `In Sanskrit ontology, a Name Word (नामपदम्) represents an established substance or realized state (सिद्धभाव), standing as an object of meditation.`
-        : `An Action Word (क्रियापदम्) captures unfolding dynamism (साध्यभाव), the cosmic flux of time, intentionality, and movement.`,
-      literaryContext: `Demonstrates the fundamental architectural duality in Pāṇini's grammar between Nāma and Ākhyāta.`,
+        ? `A Name Word represents established reality (सिद्धभाव) — an enduring ontological substance.`
+        : `An Action Word captures unfolding dynamism (साध्यभाव) — the living pulse of movement and will.`,
+      literaryContext: `Demonstrates the deep versatility of Sanskrit roots yielding diverse nominal and verbal derivatives.`,
       exampleSentence: {
         sanskrit: isNama 
-          ? `${currentResult.sanskrit} मङ्गलं ददाति विदुषां चेतसि।` 
-          : `${currentResult.sanskrit} धीरो जनः धर्ममार्गे।`,
+          ? `${currentResult.sanskrit} मङ्गलं विधत्ते सताम्।` 
+          : `${currentResult.sanskrit} धीरो जनः सदा धर्मे।`,
         iast: isNama 
-          ? `${currentResult.iast} maṅgalaṃ dadāti viduṣāṃ cetasi.` 
-          : `${currentResult.iast} dhīro janaḥ dharmamārge.`,
+          ? `${currentResult.iast} maṅgalaṃ vidhatte satām.` 
+          : `${currentResult.iast} dhīro janaḥ sadā dharme.`,
         translation: isNama
-          ? `The sacred form '${currentResult.sanskrit}' confers auspicious clarity upon the minds of the wise.`
-          : `The steadfast being acts and rejoices firmly on the noble path.`,
-        source: "Classical Sanskrit Analysis"
+          ? `The sacred derivative '${currentResult.sanskrit}' confers auspicious grace upon the good.`
+          : `The noble soul acts and perseveres steadfastly in righteousness.`,
+        source: "Classical Sanskrit Formulation"
       }
     };
   }, [suffixTargetType, currentDhatu, currentUpasarga, currentResult, dynamicMatrixData]);
@@ -714,7 +876,7 @@ export default function SanskritMorphEngine() {
       const nextDhatu = DHATUS[nextIdx];
       if (!nextDhatu.canHavePrefix) {
         setSuffixTargetType('nama');
-        showToast(`'${nextDhatu.sanskrit}' is a Nominal Stem (प्रातिपदिक). Matrix set to 7 × 3.`);
+        showToast(`'${nextDhatu.sanskrit}' is a Nominal Stem (प्रातिपदिक). Switched to Name Word 7 × 3.`);
       }
     }
   };
@@ -732,7 +894,7 @@ export default function SanskritMorphEngine() {
       const prefixStr = currentUpasarga.isNone ? "(विना)" : currentUpasarga.sanskrit;
       newEntry = {
         id: `eq-${Date.now()}`,
-        sanskrit: `${prefixStr} + ${currentDhatu.sanskrit} = ${currentResult.sanskrit} [${suffixTargetType === 'kriya' ? 'क्रिया' : 'नाम'}]`,
+        sanskrit: `${prefixStr} + ${currentDhatu.sanskrit} = ${currentResult.sanskrit} [${currentResult.tag}]`,
         iast: `${currentUpasarga.iast} + ${currentDhatu.iast} -> ${currentResult.iast}`,
         meaning: `${currentResult.meaning} (${suffixTargetType === 'kriya' ? 'Action Word' : 'Name Word'})`,
         sourceType: 'equation',
@@ -923,13 +1085,13 @@ export default function SanskritMorphEngine() {
               <div className="text-center mb-6">
                 <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 text-[11px] font-mono uppercase tracking-widest mb-3">
                   <Sparkles className="w-3 h-3 text-indigo-400" />
-                  <span>Toggle Suffix Dial (Action vs Name) to Morph Paradigm Matrix</span>
+                  <span>Explore Multiple Action & Name Word Options Below</span>
                 </div>
                 <h2 className="text-2xl md:text-3xl font-light tracking-tight text-white font-serif">
                   Morphological Equation Studio
                 </h2>
                 <p className="text-xs text-slate-400 max-w-xl mx-auto mt-1">
-                  Switch the suffix dial between <span className="text-indigo-300 font-medium">Action Word (क्रिया)</span> and <span className="text-purple-300 font-medium">Name Word (नाम)</span> to recompute and visually verify the resulting paradigm matrix.
+                  Toggle between <span className="text-indigo-300 font-medium">Action Word</span> and <span className="text-purple-300 font-medium">Name Word</span>, then choose from multiple derived forms to visually verify the paradigm matrix.
                 </p>
               </div>
 
@@ -1098,33 +1260,29 @@ export default function SanskritMorphEngine() {
 
                 <div className="text-2xl font-light text-slate-600 select-none self-center">=</div>
 
-                {/* 3. SUFFIX DIAL: WITH HIGH-LEVEL TOGGLE (ACTION WORD VS NAME WORD) */}
+                {/* 3. SUFFIX DIAL: HIGH-LEVEL TOGGLE + MULTI-OPTION EXPLORATION */}
                 <div 
-                  onClick={() => setCurrentStep('matrix')}
-                  className="group relative flex-1 w-full max-w-sm p-6 rounded-2xl bg-gradient-to-b from-indigo-950/35 via-indigo-900/10 to-transparent border border-indigo-500/35 hover:border-indigo-500/75 transition-all cursor-pointer flex flex-col items-center text-center backdrop-blur-md shadow-2xl"
-                  title="Click to view full Paradigm Matrix table"
+                  className="group relative flex-1 w-full max-w-sm p-6 rounded-2xl bg-gradient-to-b from-indigo-950/35 via-indigo-900/10 to-transparent border border-indigo-500/35 hover:border-indigo-500/75 transition-all flex flex-col items-center text-center backdrop-blur-md shadow-2xl"
                 >
-                  <div className="absolute top-3 right-3 text-[10px] font-mono text-indigo-300 flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
-                    <span>STEP 2</span>
-                    <ArrowRight className="w-3 h-3" />
+                  <div className="absolute top-3 right-3 text-[10px] font-mono text-indigo-300 flex items-center gap-1">
+                    <span className="px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-200">
+                      {activeOptionIndex + 1}/{activeOptionList.length}
+                    </span>
                   </div>
                   
                   <div className="text-[11px] uppercase tracking-wider text-indigo-300 font-mono mb-2">
                     Suffix Dial (प्रत्यय-प्रक्रिया)
                   </div>
 
-                  {/* HIGH-LEVEL TOGGLE: ACTION WORD (क्रियापदम्) vs NAME WORD (नामपदम्) */}
-                  <div 
-                    onClick={(e) => e.stopPropagation()} 
-                    className="w-full mb-3 p-1 rounded-xl bg-black/40 border border-white/10 flex items-center gap-1 shadow-inner backdrop-blur-sm"
-                  >
+                  {/* 1. HIGH-LEVEL TOGGLE: ACTION WORD vs NAME WORD */}
+                  <div className="w-full mb-3 p-1 rounded-xl bg-black/40 border border-white/10 flex items-center gap-1 shadow-inner backdrop-blur-sm">
                     <button
                       type="button"
                       onClick={() => {
                         setSuffixTargetType('kriya');
-                        showToast("Suffix set to Action Word: Paradigm Matrix is now 3 × 3 Verbal Grid.");
+                        showToast("Switched to Action Word (3 × 3 Verbal Matrix).");
                       }}
-                      className={`flex-1 py-1.5 px-2.5 rounded-lg text-[11px] font-medium transition-all flex items-center justify-center gap-1.5 ${
+                      className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-medium transition-all flex items-center justify-center gap-1.5 ${
                         suffixTargetType === 'kriya'
                           ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white shadow-md shadow-indigo-600/30 font-semibold'
                           : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
@@ -1138,9 +1296,9 @@ export default function SanskritMorphEngine() {
                       type="button"
                       onClick={() => {
                         setSuffixTargetType('nama');
-                        showToast("Suffix set to Name Word: Paradigm Matrix is now 7 × 3 Nominal Grid.");
+                        showToast("Switched to Name Word (7 × 3 Nominal Matrix).");
                       }}
-                      className={`flex-1 py-1.5 px-2.5 rounded-lg text-[11px] font-medium transition-all flex items-center justify-center gap-1.5 ${
+                      className={`flex-1 py-1.5 px-2 rounded-lg text-[11px] font-medium transition-all flex items-center justify-center gap-1.5 ${
                         suffixTargetType === 'nama'
                           ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-600/30 font-semibold'
                           : 'text-slate-400 hover:text-white hover:bg-white/[0.04]'
@@ -1151,26 +1309,82 @@ export default function SanskritMorphEngine() {
                     </button>
                   </div>
 
-                  {/* Derivative Result Display */}
-                  <div className="text-4xl md:text-5xl font-bold tracking-tight text-white my-2 group-hover:scale-105 transition-transform font-serif text-indigo-100">
-                    {currentResult.sanskrit}
-                  </div>
-                  <div className="text-sm font-mono text-indigo-300 mb-1">{currentResult.iast}</div>
-                  <div className="text-xs text-slate-200 italic min-h-[30px] flex items-center justify-center">
-                    &ldquo;{currentResult.meaning}&rdquo;
+                  {/* 2. MULTI-OPTION EXPLORATION CHIPS (Options available for that specific root!) */}
+                  <div className="w-full flex items-center justify-between gap-1 mb-2">
+                    <button
+                      onClick={() => cycleOption(-1)}
+                      className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+                      title="Previous Option"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+
+                    <div className="flex-1 flex flex-wrap items-center justify-center gap-1.5">
+                      {activeOptionList.map((opt, idx) => {
+                        const isSelected = (activeOptionIndex % activeOptionList.length) === idx;
+                        return (
+                          <button
+                            key={opt.id}
+                            onClick={() => {
+                              if (suffixTargetType === 'kriya') {
+                                setSelectedActionIndex(idx);
+                              } else {
+                                setSelectedNameIndex(idx);
+                              }
+                            }}
+                            className={`text-[10px] px-2 py-0.5 rounded-md font-mono transition-all ${
+                              isSelected
+                                ? 'bg-indigo-500/30 border border-indigo-400/60 text-white font-semibold shadow-sm'
+                                : 'bg-white/[0.03] text-slate-400 hover:text-slate-200 border border-white/[0.05]'
+                            }`}
+                          >
+                            <span>{opt.sanskrit}</span>
+                            <span className="text-[9px] text-indigo-300/80 ml-1">({opt.tag.split(' ')[0]})</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <button
+                      onClick={() => cycleOption(1)}
+                      className="p-1 rounded-md text-slate-400 hover:text-white hover:bg-white/5 transition-colors"
+                      title="Next Option"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
                   </div>
 
-                  {/* Visual Verification Banner in Suffix Dial */}
-                  <div className="mt-3 pt-3 border-t border-indigo-500/20 w-full flex flex-col items-center gap-1">
+                  {/* Derivative Result Display (Click to cycle options) */}
+                  <div 
+                    onClick={() => cycleOption(1)}
+                    className="cursor-pointer py-1 group/res w-full flex flex-col items-center"
+                    title="Click to cycle next available derivative"
+                  >
+                    <div className="text-4xl md:text-5xl font-bold tracking-tight text-white my-1 group-hover/res:scale-105 transition-transform font-serif text-indigo-100">
+                      {currentResult.sanskrit}
+                    </div>
+                    <div className="text-sm font-mono text-indigo-300 mb-0.5">{currentResult.iast}</div>
+                    <div className="text-xs text-slate-200 italic min-h-[28px] flex items-center justify-center">
+                      &ldquo;{currentResult.meaning}&rdquo;
+                    </div>
+                  </div>
+
+                  {/* Context and Navigation Pill */}
+                  <div className="mt-2 pt-2.5 border-t border-indigo-500/20 w-full flex flex-col items-center gap-1">
                     <div className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-300 border border-indigo-500/20">
                       {suffixTargetType === 'kriya' 
                         ? "Matrix: 3 Persons × 3 Numbers (3 × 3)" 
                         : "Matrix: 7 Cases × 3 Numbers (7 × 3)"}
                     </div>
-                    <span className="text-[11px] text-indigo-300/80 flex items-center gap-1 mt-0.5">
+
+                    <button
+                      onClick={() => setCurrentStep('matrix')}
+                      className="text-[11px] text-indigo-300 hover:text-white flex items-center gap-1 mt-1 transition-colors"
+                    >
                       <Table className="w-3 h-3" />
-                      <span>Click block to view matrix table</span>
-                    </span>
+                      <span>View in Paradigm Matrix Table</span>
+                      <ArrowRight className="w-3 h-3" />
+                    </button>
                   </div>
                 </div>
 
@@ -1221,7 +1435,7 @@ export default function SanskritMorphEngine() {
               className="w-full flex flex-col items-center"
             >
               {/* Matrix Header Navigation Controls & Synced High-Level Toggle */}
-              <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
+              <div className="w-full flex flex-col md:flex-row items-center justify-between gap-4 mb-6">
                 <button
                   onClick={() => setCurrentStep('equation')}
                   className="flex items-center gap-2 px-3.5 py-1.5 text-xs font-medium bg-white/[0.03] hover:bg-white/[0.08] border border-white/[0.08] rounded-xl transition-colors text-slate-300"
@@ -1230,37 +1444,69 @@ export default function SanskritMorphEngine() {
                   <span>Back to Step 1: Equation</span>
                 </button>
 
-                {/* SYNCED HIGH-LEVEL TOGGLE: Users can toggle right inside the Matrix view! */}
-                <div className="flex items-center p-1 rounded-xl bg-black/40 border border-white/10 shadow-inner">
-                  <button
-                    onClick={() => {
-                      setSuffixTargetType('kriya');
-                      showToast("Matrix dynamically switched to 3 × 3 Action Word (Verbal) Conjugation.");
-                    }}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-all ${
-                      suffixTargetType === 'kriya'
-                        ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white font-semibold shadow-md'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <Activity className="w-3.5 h-3.5" />
-                    <span>Action Word (3 × 3)</span>
-                  </button>
+                {/* SYNCED HIGH-LEVEL TOGGLE & DERIVATIVE SELECTION PILLS */}
+                <div className="flex flex-col sm:flex-row items-center gap-2">
+                  
+                  {/* Action vs Name toggle */}
+                  <div className="flex items-center p-1 rounded-xl bg-black/40 border border-white/10 shadow-inner">
+                    <button
+                      onClick={() => {
+                        setSuffixTargetType('kriya');
+                        showToast("Matrix dynamically switched to 3 × 3 Action Word (Verbal) Conjugation.");
+                      }}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-all ${
+                        suffixTargetType === 'kriya'
+                          ? 'bg-gradient-to-r from-indigo-600 to-indigo-500 text-white font-semibold shadow-md'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <Activity className="w-3.5 h-3.5" />
+                      <span>Action Word (3 × 3)</span>
+                    </button>
 
-                  <button
-                    onClick={() => {
-                      setSuffixTargetType('nama');
-                      showToast("Matrix dynamically switched to 7 × 3 Name Word (Nominal) Declension.");
-                    }}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-all ${
-                      suffixTargetType === 'nama'
-                        ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold shadow-md'
-                        : 'text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    <Sparkles className="w-3.5 h-3.5" />
-                    <span>Name Word (7 × 3)</span>
-                  </button>
+                    <button
+                      onClick={() => {
+                        setSuffixTargetType('nama');
+                        showToast("Matrix dynamically switched to 7 × 3 Name Word (Nominal) Declension.");
+                      }}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg transition-all ${
+                        suffixTargetType === 'nama'
+                          ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-semibold shadow-md'
+                          : 'text-slate-400 hover:text-white'
+                      }`}
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Name Word (7 × 3)</span>
+                    </button>
+                  </div>
+
+                  {/* Sub-option pills for that category */}
+                  <div className="flex items-center gap-1 p-1 rounded-xl bg-white/[0.02] border border-white/[0.06]">
+                    {activeOptionList.map((opt, idx) => {
+                      const isSelected = (activeOptionIndex % activeOptionList.length) === idx;
+                      return (
+                        <button
+                          key={opt.id}
+                          onClick={() => {
+                            if (suffixTargetType === 'kriya') {
+                              setSelectedActionIndex(idx);
+                            } else {
+                              setSelectedNameIndex(idx);
+                            }
+                            showToast(`Paradigm Matrix recomputed for '${opt.sanskrit}'.`);
+                          }}
+                          className={`text-xs px-2.5 py-1 rounded-lg font-serif transition-all ${
+                            isSelected
+                              ? 'bg-indigo-600 text-white font-semibold shadow-sm'
+                              : 'text-slate-400 hover:text-white hover:bg-white/5'
+                          }`}
+                        >
+                          {opt.sanskrit}
+                        </button>
+                      );
+                    })}
+                  </div>
+
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -1287,7 +1533,7 @@ export default function SanskritMorphEngine() {
                 </p>
               </div>
 
-              {/* CLUTTER-FREE TRANSPARENT MATRIX GRID: Dynamically rendered based on toggle */}
+              {/* CLUTTER-FREE TRANSPARENT MATRIX GRID */}
               <div className="w-full overflow-x-auto my-2 pb-4">
                 <div className="min-w-[720px] grid grid-cols-4 gap-2 text-sm">
                   
@@ -1499,7 +1745,7 @@ export default function SanskritMorphEngine() {
                     <div className="flex items-center gap-2 mb-2">
                       <Feather className="w-4 h-4 text-indigo-400" />
                       <h4 className="text-sm font-mono uppercase tracking-wider text-slate-300 font-semibold">
-                        Ontological Nuance & Semantic Transfiguration
+                        Semantic Nuance & Pāṇinian Rule Application
                       </h4>
                     </div>
                     <p className="text-sm text-slate-300 italic font-serif leading-relaxed">
@@ -1807,7 +2053,7 @@ export default function SanskritMorphEngine() {
             <p className="text-xs md:text-sm text-slate-300 font-serif leading-relaxed">
               {currentStep === 'equation' && (
                 <>
-                  &ldquo;Suffix dial configured for <span className="text-indigo-300 font-sans font-semibold">{suffixTargetType === 'kriya' ? 'Action Word (क्रियापदम्)' : 'Name Word (नामपदम्)'}</span>. Root <span className="text-indigo-300 font-sans font-semibold">&lsquo;{currentDhatu.sanskrit}&rsquo;</span> with prefix <span className="text-indigo-300 font-sans font-semibold">&lsquo;{currentUpasarga.sanskrit}&rsquo;</span> produces <span className="text-white font-sans font-bold">&lsquo;{currentResult.sanskrit}&rsquo;</span>. Yields {suffixTargetType === 'kriya' ? '3 × 3 verbal matrix' : '7 × 3 nominal matrix'}.&rdquo;
+                  &ldquo;Root <span className="text-indigo-300 font-sans font-semibold">&lsquo;{currentDhatu.sanskrit}&rsquo;</span> with prefix <span className="text-indigo-300 font-sans font-semibold">&lsquo;{currentUpasarga.sanskrit}&rsquo;</span> derived as {suffixTargetType === 'kriya' ? 'Action Word' : 'Name Word'} <span className="text-white font-sans font-bold">&lsquo;{currentResult.sanskrit}&rsquo;</span> ({currentResult.tag}). Generates {suffixTargetType === 'kriya' ? '3 × 3 verbal matrix' : '7 × 3 nominal matrix'}.&rdquo;
                 </>
               )}
               {currentStep === 'matrix' && (
@@ -1817,7 +2063,7 @@ export default function SanskritMorphEngine() {
               )}
               {currentStep === 'etymology' && (
                 <>
-                  &ldquo;Pāṇinian analysis for <span className="text-indigo-300 font-sans font-semibold">{suffixTargetType === 'kriya' ? 'Tiṅanta (Action)' : 'Subanta (Name)'}</span>: governed by <span className="text-indigo-300 font-sans font-semibold">{currentEtymology.sutraNumber}</span>. Demonstrates semantic culmination into <span className="text-white font-sans font-bold">&lsquo;{currentResult.sanskrit}&rsquo;</span>.&rdquo;
+                  &ldquo;Pāṇinian analysis for <span className="text-indigo-300 font-sans font-semibold">{currentResult.sanskrit}</span> ({currentResult.tag}): governed by <span className="text-indigo-300 font-sans font-semibold">{currentEtymology.sutraNumber}</span>.&rdquo;
                 </>
               )}
             </p>
