@@ -699,9 +699,10 @@ export default function SanskritMorphEngine() {
   const [selectedRowIndex, setSelectedRowIndex] = useState<number>(0);
   const [selectedColIndex, setSelectedColIndex] = useState<number>(0);
 
-  // Audio speech synthesis & wave animation
+  // Audio speech synthesis & wave animation (100% OFFLINE — uses browser-native Web Speech API, zero AI)
   const [isSpeaking, setIsSpeaking] = useState<boolean>(false);
   const [voiceActive, setVoiceActive] = useState<boolean>(true);
+  const [availableVoices, setAvailableVoices] = useState<SpeechSynthesisVoice[]>([]);
 
   // Notebook drawer state
   const [isNotebookOpen, setIsNotebookOpen] = useState<boolean>(false);
@@ -991,29 +992,128 @@ export default function SanskritMorphEngine() {
     };
   }, [dhatuIndex, currentDhatu, suffixTargetType, currentResult, currentUpasarga, dynamicMatrixData]);
 
-  // Audio Speech Synthesis
-  const speakSanskrit = useCallback((text: string) => {
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-    try {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = 'hi-IN';
-      utterance.rate = 0.85;
-      utterance.pitch = 1.0;
-      utterance.onstart = () => setIsSpeaking(true);
-      utterance.onend = () => setIsSpeaking(false);
-      utterance.onerror = () => setIsSpeaking(false);
-      window.speechSynthesis.speak(utterance);
-    } catch {
-      setIsSpeaking(false);
-    }
-  }, []);
-
-  const showToast = (msg: string) => {
+  const showToast = useCallback((msg: string) => {
     setFeedbackToast(msg);
     setTimeout(() => setFeedbackToast(null), 3500);
-  };
+  }, []);
 
+  // ---------------------------------------------------------------
+  // OFFLINE Voice Narrator — Browser-native Web Speech API (NO AI)
+  // ---------------------------------------------------------------
+  // Preload voices on mount. Chrome loads voices asynchronously, so
+  // we must listen for the onvoiceschanged event to get the full list.
+  React.useEffect(() => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+
+    const loadVoices = () => {
+      const voices = window.speechSynthesis.getVoices();
+      if (voices.length > 0) {
+        setAvailableVoices(voices);
+      }
+    };
+
+    loadVoices(); // Immediate attempt (works in Firefox/Safari)
+    window.speechSynthesis.onvoiceschanged = loadVoices; // Async callback (needed for Chrome)
+
+    return () => {
+      window.speechSynthesis.onvoiceschanged = null;
+    };
+  }, []);
+
+  // Pick the best available voice for Sanskrit/Hindi text.
+  // Priority: hi-IN > hi > en-IN > any Indic > default system voice.
+  const getBestVoice = useCallback((): SpeechSynthesisVoice | null => {
+    if (availableVoices.length === 0) return null;
+
+    // Priority 1: Hindi India voice
+    const hiIN = availableVoices.find(v => v.lang === 'hi-IN');
+    if (hiIN) return hiIN;
+
+    // Priority 2: Any Hindi voice
+    const hi = availableVoices.find(v => v.lang.startsWith('hi'));
+    if (hi) return hi;
+
+    // Priority 3: English India voice (reasonably good for Devanagari)
+    const enIN = availableVoices.find(v => v.lang === 'en-IN');
+    if (enIN) return enIN;
+
+    // Priority 4: Any Indic language voice (sa, mr, bn, ta, etc.)
+    const indic = availableVoices.find(v =>
+      ['sa', 'mr', 'bn', 'ta', 'te', 'kn', 'ml', 'gu', 'pa', 'or'].some(code => v.lang.startsWith(code))
+    );
+    if (indic) return indic;
+
+    // Priority 5: Default system voice
+    const defaultVoice = availableVoices.find(v => v.default);
+    return defaultVoice || availableVoices[0];
+  }, [availableVoices]);
+
+  // Speak text aloud using the browser's OFFLINE speech synthesis engine.
+  // This is 100% local — no network calls, no API keys, no AI, no limits.
+  const speakSanskrit = useCallback((text: string) => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      showToast("Speech synthesis is not supported in this browser.");
+      return;
+    }
+
+    if (!text || text === '—') return;
+
+    try {
+      // Cancel any in-progress speech
+      window.speechSynthesis.cancel();
+
+      // Chrome has a known bug where speech silently fails after ~15s of inactivity.
+      // Workaround: resume the synthesis engine before speaking.
+      window.speechSynthesis.resume();
+
+      const utterance = new SpeechSynthesisUtterance(text);
+
+      // Assign the best available voice
+      const voice = getBestVoice();
+      if (voice) {
+        utterance.voice = voice;
+        utterance.lang = voice.lang;
+      } else {
+        utterance.lang = 'hi-IN'; // Fallback hint
+      }
+
+      utterance.rate = 0.82;
+      utterance.pitch = 1.05;
+      utterance.volume = 1.0;
+
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = (e) => {
+        setIsSpeaking(false);
+        if (e.error !== 'canceled' && e.error !== 'interrupted') {
+          console.warn('Speech synthesis error:', e.error);
+        }
+      };
+
+      window.speechSynthesis.speak(utterance);
+
+      // Chrome workaround: keep the synth engine alive during long utterances
+      // by periodically calling resume() while speech is in progress.
+      const keepAlive = setInterval(() => {
+        if (!window.speechSynthesis.speaking) {
+          clearInterval(keepAlive);
+        } else {
+          window.speechSynthesis.resume();
+        }
+      }, 10000);
+
+      utterance.onend = () => {
+        clearInterval(keepAlive);
+        setIsSpeaking(false);
+      };
+
+    } catch (err) {
+      console.warn('Speech synthesis failed:', err);
+      setIsSpeaking(false);
+    }
+  }, [getBestVoice, showToast]);
+
+  
   // Upasarga Cycling:
   // Inactive for toggle and set to none by default.
   // ONLY active for toggle if the root dial has selected a root word which allows prefix!
